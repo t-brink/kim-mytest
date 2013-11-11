@@ -176,6 +176,7 @@ public:
     return neigh_rvec;
   }
 
+  /// Write LAMMPS dump file.
   const void write_to(const string& filename) const {
     ofstream myfile;
     myfile.open(filename);
@@ -193,9 +194,41 @@ public:
              << coordinates_(i,2) << "\n";
   }
 
+  /// Scale box by a factor.
+  void scale(double factor_x, double factor_y, double factor_z) {
+    box_size_[0] *= factor_x;
+    box_size_[1] *= factor_y;
+    box_size_[2] *= factor_z;
+    for (int i = 0; i != N; ++i) {
+      coordinates_(i,0) *= factor_x;
+      coordinates_(i,1) *= factor_y;
+      coordinates_(i,2) *= factor_z;
+    }
+  }
+
+  void scale(double factor) {
+    box_size_ *= factor;
+    coordinates_ *= factor;
+  };
+
+  /// Scale box so it conforms to given size.
+  void scale_to(double x, double y, double z) {
+    const double factor_x = x / box_size_[0];
+    const double factor_y = y / box_size_[1];
+    const double factor_z = z / box_size_[2];
+    box_size_[0] = x;
+    box_size_[1] = y;
+    box_size_[2] = z;
+    for (int i = 0; i != N; ++i) {
+      coordinates_(i,0) *= factor_x;
+      coordinates_(i,1) *= factor_y;
+      coordinates_(i,2) *= factor_z;
+    }
+  }
+
 protected:
   const int N; // Number of atoms.
-  const Vec3D<double> box_size_;
+  Vec3D<double> box_size_;
   Array2D<double> coordinates_;
   vector<int> types_;
   vector< vector<int> > neigh_list;
@@ -567,7 +600,7 @@ public:
     model->model_compute();
   }
 
-  const Box& box() const {
+  Box& box() {
     return *box_;
   }
 
@@ -664,9 +697,10 @@ void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
 // Main ////////////////////////////////////////////////////////////////
 
 int main() {
+  /*
   typedef pair<KIMNeigh,string> np;
   vector<np> neigh_modes = {
-    /*np(KIM_cluster, "cluster"),*/
+    //np(KIM_cluster, "cluster"),
     np(KIM_mi_opbc_f, "MI_OPBC"),
     np(KIM_neigh_pure_f, "neighbor list"),
     np(KIM_neigh_rvec_f, "neighbor list with distance vectors")
@@ -681,6 +715,39 @@ int main() {
     print_structure("diamond", 5.429, neigh_mode.first);
     cout << "\n";
   }
+  */
+
+  ofstream outfile;
+  outfile.open("diamond.bulkmod.dat");
+  outfile << "# V             E           factor\n"
+          << "# (ang/atom)    (eV/atom)\n";
+  cout << "Calculating rigid bulk modulus for diamond Si..." << flush;
+  const clock_t start_time = clock();
+  Compute diamond("diamond", 5.429, true, true, KIM_mi_opbc_f);
+  const Vec3D<double> size0 = diamond.box().box_size();
+  /*int j = 0;*/
+  const double deviation = 0.15; // min = 1 - deviation, max = 1 + deviation
+  const int halfsteps = 10; // halfsteps*2 + 1 = real steps
+  for (int i = -halfsteps; i <= halfsteps; ++i) {
+    const double factor = 1.0 + (deviation/halfsteps)*i;
+    const Vec3D<double> new_size = factor * size0;
+    diamond.box().scale_to(new_size[0], new_size[1], new_size[2]);
+    diamond.compute();
+    outfile << diamond.box().get_volume() / diamond.box().natoms()
+            << " "
+            << diamond.get_energy_per_atom()
+            << " "
+            << factor
+            << endl;
+    /*
+    const string dumpname = string("dump.") + to_string(j++);
+    diamond.box().write_to(dumpname);
+    */
+  }
+  const clock_t stop_time = clock();
+  cout << "done in "
+       << double(stop_time - start_time) / CLOCKS_PER_SEC
+       <<" s, written to diamond.bulkmod.dat" << endl;
 
   return 0;
 }

@@ -500,6 +500,13 @@ namespace mytest {
       return data[i*extent_inner + j];
     }
 
+    Array2D<T>& operator*=(const T& rhs) {
+      const int size = extent_outer * extent_inner;
+      for (int i = 0; i != size; ++i)
+        data[i] *= rhs;
+      return *this;
+    }
+
   private:
     T* data;
     int extent_outer, extent_inner;
