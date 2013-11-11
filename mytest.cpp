@@ -213,7 +213,7 @@ public:
     coordinates_(1, 1) = 50.0;
     coordinates_(1, 2) = 50.0;
     for (int i = 0; i != N; ++i)
-      types_[i] = 0;//i % 2; // Si and C mixed
+      types_[i] = 0;//i % 2; // Si and C mixed    TODO      
   }
 };
 
@@ -233,7 +233,7 @@ public:
           i += 1;
         }
     for (i = 0; i != N; ++i)
-      types_[i] = 0;//i % 2; // Si and C mixed
+      types_[i] = 0;//i % 2; // Si and C mixed    TODO      
   }
 };
 
@@ -257,7 +257,7 @@ public:
           i += 2;
         }
     for (i = 0; i != N; ++i)
-      types_[i] = 0;//i % 2; // Si and C mixed
+      types_[i] = 0;//i % 2; // Si and C mixed    TODO      
   }
 };
 
@@ -287,7 +287,7 @@ public:
           i += 4;
         }
     for (i = 0; i != N; ++i)
-      types_[i] = 0;//i % 2; // Si and C mixed
+      types_[i] = 0;//i % 2; // Si and C mixed    TODO      
   }
 };
 
@@ -331,7 +331,7 @@ public:
           i += 8;
         }
     for (i = 0; i != N; ++i)
-      types_[i] = 0;//i % 2; // Si and C mixed
+      types_[i] = 0;//i % 2; // Si and C mixed    TODO      
   }
 };
 
