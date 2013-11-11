@@ -133,6 +133,10 @@ public:
     return box_size_;
   }
 
+  double get_volume() const {
+    return box_size_[0] * box_size_[1] * box_size_[2];
+  }
+
   const Array2D<double>& coordinates() const {
     return coordinates_;
   }
@@ -575,6 +579,22 @@ public:
     return energy / natoms;
   }
 
+  double get_neighbor_time() const {
+    return neighbor_time;
+  }
+
+  /// The stress from virial without kinetic energy contribution in GPa.
+  vector<double> get_stress() const {
+    double V = box_->get_volume();
+    double pxx = 160.2177 * virial[0] / V; // GPa
+    double pyy = 160.2177 * virial[1] / V; // GPa
+    double pzz = 160.2177 * virial[2] / V; // GPa
+    double pyz = 160.2177 * virial[3] / V; // GPa
+    double pxz = 160.2177 * virial[4] / V; // GPa
+    double pxy = 160.2177 * virial[5] / V; // GPa
+    return { pxx, pyy, pzz, pyz, pxz, pxy };
+  }
+
   void set_param(const string& name, const string& elem1,
                  const string& elem2, const string& elem3, double value) {
     int status;
@@ -625,79 +645,46 @@ private:
 };
 
 
+// Helpers for main. ///////////////////////////////////////////////////
+void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
+  printf("%-8s ", lattice.c_str()); fflush(stdout);
+  Compute c(lattice, a, true, true, neighmode);
+  if (lattice == "fcc") {
+    c.set_param("PARAM_FREE_Rc", "Si", "Si", "Si", 2.9);
+    c.set_param("PARAM_FREE_Dc", "Si", "Si", "Si", 0.15);
+  }
+  const clock_t start_time = clock();
+  c.compute();
+  const clock_t stop_time = clock();
+  const vector<double> stress = c.get_stress();
+  printf("%8.5f eV/atom       %+.2e  %+.2e  %+.2e   %7d atoms in %6.3f s + %6.3f s\n",
+         c.get_energy_per_atom(),
+         stress[0], stress[1], stress[2],
+         c.box().natoms(),
+         c.get_neighbor_time(),
+         double(stop_time - start_time) / CLOCKS_PER_SEC);
+}
+
+
+
 // Main ////////////////////////////////////////////////////////////////
 
 int main() {
   typedef pair<KIMNeigh,string> np;
   vector<np> neigh_modes = {
-    np(KIM_cluster, "cluster"),
+    /*np(KIM_cluster, "cluster"),*/
     np(KIM_mi_opbc_f, "MI_OPBC"),
     np(KIM_neigh_pure_f, "neighbor list"),
     np(KIM_neigh_rvec_f, "neighbor list with distance vectors")
   };
   for (const pair<KIMNeigh,string>& neigh_mode : neigh_modes) {
-    cout << "* Neighbor mode: " << neigh_mode.second << endl;
-    {
-      cout << "dimer    " << flush;
-      Compute dimer("dimer", 2.232, true, true, neigh_mode.first);
-      const clock_t start_time = clock();
-      dimer.compute();
-      const clock_t stop_time = clock();
-      printf("%8.5f eV/atom       %7d atoms in %6.3f s\n",
-             dimer.get_energy_per_atom(),
-             dimer.box().natoms(),
-             double(stop_time - start_time) / CLOCKS_PER_SEC);
-    }
-
-    {
-      cout << "sc       " << flush;
-      Compute sc("sc", 2.525, true, true, neigh_mode.first);
-      const clock_t start_time = clock();
-      sc.compute();
-      const clock_t stop_time = clock();
-      printf("%8.5f eV/atom       %7d atoms in %6.3f s\n",
-             sc.get_energy_per_atom(),
-             sc.box().natoms(),
-             double(stop_time - start_time) / CLOCKS_PER_SEC);
-    }
-
-    {
-      cout << "bcc      " << flush;
-      Compute bcc("bcc", 3.043, true, true, neigh_mode.first);
-      const clock_t start_time = clock();
-      bcc.compute();
-      const clock_t stop_time = clock();
-      printf("%8.5f eV/atom       %7d atoms in %6.3f s\n",
-             bcc.get_energy_per_atom(),
-             bcc.box().natoms(),
-             double(stop_time - start_time) / CLOCKS_PER_SEC);
-    }
-
-    {
-      cout << "fcc      " << flush;
-      Compute fcc("fcc", 3.940, true, true, neigh_mode.first);
-      fcc.set_param("PARAM_FREE_Rc", "Si", "Si", "Si", 2.9);
-      fcc.set_param("PARAM_FREE_Dc", "Si", "Si", "Si", 0.15);
-      const clock_t start_time = clock();
-      fcc.compute();
-      const clock_t stop_time = clock();
-      printf("%8.5f eV/atom       %7d atoms in %6.3f s\n",
-             fcc.get_energy_per_atom(),
-             fcc.box().natoms(),
-             double(stop_time - start_time) / CLOCKS_PER_SEC);
-    }
-
-    {
-      cout << "diamond  " << flush;
-      Compute diamond("diamond", 5.429, true, true, neigh_mode.first);
-      const clock_t start_time = clock();
-      diamond.compute();
-      const clock_t stop_time = clock();
-      printf("%8.5f eV/atom       %7d atoms in %6.3f s\n",
-             diamond.get_energy_per_atom(),
-             diamond.box().natoms(),
-             double(stop_time - start_time) / CLOCKS_PER_SEC);
-    }
+    cout << "* Neighbor mode: " << neigh_mode.second << "\n" << endl;
+    cout << "struc    E                      pxx        pyy        pzz" << endl;
+    print_structure("dimer",   2.232, neigh_mode.first);
+    print_structure("sc",      2.525, neigh_mode.first);
+    print_structure("bcc",     3.043, neigh_mode.first);
+    print_structure("fcc",     3.940, neigh_mode.first);
+    print_structure("diamond", 5.429, neigh_mode.first);
     cout << "\n";
   }
 
