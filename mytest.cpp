@@ -101,6 +101,7 @@ protected:
       coordinates_(N,3),
       types_(N),
       neigh_list(N),
+      neigh_rvec(N),
       lattice_type_(lattice_type)
   {}
 
@@ -109,11 +110,19 @@ public:
 
   void init_neighbor_list(double cutoff) {
     for (int i = 0; i != N; ++i)
-      for (int j = i+1; j != N; ++j)
-        if (dist(i,j) < cutoff) {
+      for (int j = i+1; j != N; ++j) {
+        double dx, dy, dz;
+        if (dist(i,j, dx, dy, dz) < cutoff) {
           neigh_list[i].push_back(j);
           neigh_list[j].push_back(i);
+          neigh_rvec[i].push_back(dx);
+          neigh_rvec[i].push_back(dy);
+          neigh_rvec[i].push_back(dz);
+          neigh_rvec[j].push_back(-dx);
+          neigh_rvec[j].push_back(-dy);
+          neigh_rvec[j].push_back(-dz);
         }
+      }
   }
 
   const int& natoms() const {
@@ -138,20 +147,29 @@ public:
 
   // Distance using PBC (minimum image convention).
   double dist(int i, int j) const {
-    double x = coordinates_(i,0) - coordinates_(j,0);
-    double y = coordinates_(i,1) - coordinates_(j,1);
-    double z = coordinates_(i,2) - coordinates_(j,2);
-    if (abs(x) > 0.5 * box_size_[0])
-      x -= (x/abs(x))*box_size_[0];
-    if (abs(y) > 0.5 * box_size_[1])
-      y -= (y/abs(y))*box_size_[1];
-    if (abs(z) > 0.5 * box_size_[2])
-      z -= (z/abs(z))*box_size_[2];
-    return sqrt(x*x + y*y + z*z);
+    double dx, dy, dz;
+    return dist(i, j, dx, dy, dz);
+  }
+
+  double dist(int i, int j, double& dx, double& dy, double& dz) const {
+    dx = coordinates_(j,0) - coordinates_(i,0);
+    dy = coordinates_(j,1) - coordinates_(i,1);
+    dz = coordinates_(j,2) - coordinates_(i,2);
+    if (abs(dx) > 0.5 * box_size_[0])
+      dx -= (dx/abs(dx))*box_size_[0];
+    if (abs(dy) > 0.5 * box_size_[1])
+      dy -= (dy/abs(dy))*box_size_[1];
+    if (abs(dz) > 0.5 * box_size_[2])
+      dz -= (dz/abs(dz))*box_size_[2];
+    return sqrt(dx*dx + dy*dy + dz*dz);
   }
 
   const vector< vector<int> >& get_neigh_list() const {
     return neigh_list;
+  }
+
+  const vector< vector<double> >& get_neigh_rvec() const {
+    return neigh_rvec;
   }
 
   const void write_to(const string& filename) const {
@@ -177,6 +195,8 @@ protected:
   Array2D<double> coordinates_;
   vector<int> types_;
   vector< vector<int> > neigh_list;
+  vector< vector<double> > neigh_rvec; // The inner vector is actually
+                                       // an N*3 array.
   const string lattice_type_;
 };
 
@@ -318,11 +338,12 @@ public:
 
 class NeighborListIterator {
 public:
-  NeighborListIterator(const Box& box)
-    : i(0), b(box)
+  NeighborListIterator(const Box& box, bool rvec)
+    : i(0), b(box), has_rvec(rvec)
   {}
   int i;
   const Box& b;
+  bool has_rvec;
 };
 
 
@@ -351,7 +372,7 @@ unique_ptr<Box> make_box(const string& lattice, double a,
 
 int get_neigh(void *kimmdl, int *mode, int* request,
               int *particle, int *numnei, const int **nei1particle,
-              double **rij) {
+              const double **rij) {
   int status, i;
   KIM_API_model& model = **( (KIM_API_model**)kimmdl );
   NeighborListIterator& iter =
@@ -375,7 +396,10 @@ int get_neigh(void *kimmdl, int *mode, int* request,
   const vector<int>& neighbors = iter.b.get_neigh_list()[i];
   *numnei = neighbors.size();
   *nei1particle = &neighbors[0];
-  *rij = NULL;
+  if (iter.has_rvec)
+    *rij = &iter.b.get_neigh_rvec()[i][0];
+  else
+    *rij = NULL;
 
   return KIM_STATUS_OK;
 }
@@ -401,7 +425,7 @@ public:
   Compute(const string& lattice, double a,
           bool neigh_iterator, bool neigh_locator, KIMNeigh neighmode)
     : box_(make_box(lattice, a, 8, 16, 32)),
-      iter(*box_),
+      iter(*box_, neighmode == KIM_neigh_rvec_f),
       natoms(box_->natoms()),
       ntypes(-1), // Will be set later in the constructor.
       forces(natoms, 3),
