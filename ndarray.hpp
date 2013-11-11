@@ -289,6 +289,168 @@ namespace mytest {
   }
 
 
+  // Symmetric 3*3 matrix in Voigt notation //////////////////////////////
+
+  template<typename T> class Voigt6;
+
+  // Multiply Voigt6 with scalar.
+  template<typename T>
+  Voigt6<T> operator*(Voigt6<T> lhs, const T& rhs) {
+    lhs *= rhs;
+    return lhs;
+  }
+
+  // Multiply scalar with Voigt6.
+  template<typename T>
+  Voigt6<T> operator*(const T& lhs, Voigt6<T> rhs) {
+    rhs *= lhs;
+    return rhs;
+  }
+
+  // Divide Voigt6 by scalar.
+  template<typename T>
+  Voigt6<T> operator/(Voigt6<T> lhs, const T& rhs) {
+    lhs /= rhs;
+    return lhs;
+  }
+
+  // Uses {xx,yy,zz,yz,xz,xy} to store data.  Data is stored
+  // continuously.
+  template<typename T>
+  class Voigt6 {
+  public:
+    Voigt6(T xx_, T yy_, T zz_, T yz_, T xz_, T xy_)
+      : data(static_cast<T*>(std::malloc(6*sizeof(T)))), keep_data(false),
+        xx(data[0]), yy(data[1]), zz(data[2]),
+        yz(data[3]), xz(data[4]), xy(data[5])
+    {
+      data[0] = xx_; data[1] = yy_; data[2] = zz_;
+      data[3] = yz_; data[4] = xz_; data[5] = xy_;
+    }
+
+    // Uninitialized.
+    Voigt6()
+      : data(static_cast<T*>(std::malloc(6*sizeof(T)))), keep_data(false),
+        xx(data[0]), yy(data[1]), zz(data[2]),
+        yz(data[3]), xz(data[4]), xy(data[5])
+    {}
+
+    // Wrapper to externally managed memory.
+    explicit Voigt6(T* d)
+      : data(d), keep_data(true),
+        xx(data[0]), yy(data[1]), zz(data[2]),
+        yz(data[3]), xz(data[4]), xy(data[5])
+    {}
+
+    // Copy constructor.
+    Voigt6(const Voigt6<T>& other)
+      : data(static_cast<T*>(std::malloc(6*sizeof(T)))), keep_data(false),
+        xx(data[0]), yy(data[1]), zz(data[2]),
+        yz(data[3]), xz(data[4]), xy(data[5])
+    {
+      data[0] = other.data[0]; data[1] = other.data[1]; data[2] = other.data[2];
+      data[3] = other.data[3]; data[4] = other.data[4]; data[5] = other.data[5];
+    }
+
+    // Move constructor.
+    Voigt6(Voigt6<T>&& other)
+      : xx(other.data[0]), yy(other.data[1]), zz(other.data[2]),
+        yz(other.data[3]), xz(other.data[4]), xy(other.data[5])
+    {
+      data = other.data;
+      keep_data = other.keep_data;
+      other.keep_data = true; // Keep from double-freeing memory.
+    }
+
+    ~Voigt6() {
+      if (!keep_data)
+        std::free(data);
+    }
+
+    T& operator()(int i) {
+      //TODO: range check??
+      return data[i];
+    }
+    const T& operator()(int i) const {
+      //TODO: range check??
+      return data[i];
+    }
+
+    T& operator()(int i, int j) {
+      switch (i) {
+      case 0:
+        switch (j) {
+        case 0: return data[0]; // xx
+        case 1: return data[5]; // xy
+        case 2: return data[4]; // xz
+        default: throw std::runtime_error("out of bounds");
+        }
+      case 1:
+        switch (j) {
+        case 0: return data[5]; // xy
+        case 1: return data[1]; // yy
+        case 2: return data[3]; // yz
+        default: throw std::runtime_error("out of bounds");
+        }
+      case 2:
+        switch (j) {
+        case 0: return data[4]; // xz
+        case 1: return data[3]; // yz
+        case 2: return data[2]; // zz
+        default: throw std::runtime_error("out of bounds");
+        }
+      default:
+        throw std::runtime_error("out of bounds");
+      }
+    }
+    const T& operator()(int i, int j) const {
+      switch (i) {
+      case 0:
+        switch (j) {
+        case 0: return data[0]; // xx
+        case 1: return data[5]; // xy
+        case 2: return data[4]; // xz
+        default: throw std::runtime_error("out of bounds");
+        }
+      case 1:
+        switch (j) {
+        case 0: return data[5]; // xy
+        case 1: return data[1]; // yy
+        case 2: return data[3]; // yz
+        default: throw std::runtime_error("out of bounds");
+        }
+      case 2:
+        switch (j) {
+        case 0: return data[4]; // xz
+        case 1: return data[3]; // yz
+        case 2: return data[2]; // zz
+        default: throw std::runtime_error("out of bounds");
+        }
+      default:
+        throw std::runtime_error("out of bounds");
+      }
+    }
+
+    Voigt6<T>& operator*=(const T& rhs) {
+      data[0] *= rhs; data[1] *= rhs; data[2] *= rhs;
+      data[3] *= rhs; data[4] *= rhs; data[5] *= rhs;
+      return *this;
+    }
+
+    Voigt6<T>& operator/=(const T& rhs) {
+      data[0] /= rhs; data[1] /= rhs; data[2] /= rhs;
+      data[3] /= rhs; data[4] /= rhs; data[5] /= rhs;
+      return *this;
+    }
+
+  private:
+    T* data;
+    bool keep_data;
+  public:
+    const T& xx, yy, zz, yz, xz, xy;
+  };
+
+
   // n-dimensional arrays. ///////////////////////////////////////////////
 
   /*!

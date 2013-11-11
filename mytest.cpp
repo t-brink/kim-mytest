@@ -434,7 +434,7 @@ public:
       ntypes(-1), // Will be set later in the constructor.
       forces(natoms, 3),
       particleEnergy(natoms),
-      virial(6),
+      virial(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
       particleVirial(natoms, 6)
   {
     int status;
@@ -515,7 +515,7 @@ public:
                      "energy", 1, &energy, 1,
                      "forces", 3*natoms, &forces(0,0), 1,
                      "particleEnergy", natoms, &particleEnergy[0], 1,
-                     "virial", 6, &virial[0], 1,
+                     "virial", 6, &virial(0), 1,
                      "particleVirial", 6*natoms, &particleVirial(0,0), 1,
                      "neighObject", 1, &iter, 1,
                      "boxSideLengths", 3, &box_->box_size()[0], 1
@@ -584,15 +584,9 @@ public:
   }
 
   /// The stress from virial without kinetic energy contribution in GPa.
-  vector<double> get_stress() const {
+  Voigt6<double> get_stress() const {
     double V = box_->get_volume();
-    double pxx = 160.2177 * virial[0] / V; // GPa
-    double pyy = 160.2177 * virial[1] / V; // GPa
-    double pzz = 160.2177 * virial[2] / V; // GPa
-    double pyz = 160.2177 * virial[3] / V; // GPa
-    double pxz = 160.2177 * virial[4] / V; // GPa
-    double pxy = 160.2177 * virial[5] / V; // GPa
-    return { pxx, pyy, pzz, pyz, pxz, pxy };
+    return 160.2177 * virial / V; // GPa
   }
 
   void set_param(const string& name, const string& elem1,
@@ -636,7 +630,7 @@ private:
   double cutoff, energy;
   Array2D<double> forces;
   vector<double> particleEnergy;
-  vector<double> virial;
+  Voigt6<double> virial;
   Array2D<double> particleVirial;
   KIM_API_model* model;
   double neighbor_time;
@@ -656,10 +650,10 @@ void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
   const clock_t start_time = clock();
   c.compute();
   const clock_t stop_time = clock();
-  const vector<double> stress = c.get_stress();
+  const Voigt6<double> stress = c.get_stress();
   printf("%8.5f eV/atom       %+.2e  %+.2e  %+.2e   %7d atoms in %6.3f s + %6.3f s\n",
          c.get_energy_per_atom(),
-         stress[0], stress[1], stress[2],
+         stress.xx, stress.yy, stress.zz,
          c.box().natoms(),
          c.get_neighbor_time(),
          double(stop_time - start_time) / CLOCKS_PER_SEC);

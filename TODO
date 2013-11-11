@@ -1,7 +1,3 @@
-* A Voigt6 class which can be accessed as a 6-component array or as a
-  3*3 matrix
-** should have a constructor which takes C array or vector or Array1D
-
 * Array1D to match Array2D, Array3D, ...
 
 * Dynamic choice of model
