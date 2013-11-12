@@ -32,8 +32,9 @@ LOCALCLEAN =
 # APPEND to compiler option flag lists
 #FFLAGS   +=
 #CCFLAGS  +=
-CXXFLAGS += -std=c++0x -I./nlopt/include
-LDFLAGS  += -Wl,-rpath,./nlopt/lib -L./nlopt/lib -lnlopt -lm
+CXXFLAGS += -std=c++11 -Inlopt/include
+LDFLAGS  += -Wl,-rpath,nlopt/lib -Lnlopt/lib
+LDDYNAMICLIB += -lnlopt -lm
 
 # load remaining KIM make configuration
 include $(KIM_DIR)/MAKE_SYSTEM/Makefile.Test
