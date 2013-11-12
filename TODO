@@ -1,3 +1,12 @@
+* Neighborlists using ghost atoms are somewhat implemented
+** still support MI_OPBC_F *if* box is orthorhombic
+** correctly feed the ghost atoms to KIM, this is still somewhat
+   segfault-heavy :-(
+** take care to update ghost atoms and neighborlists at appropriate times
+
+* organize everything in a readable and maintainable way
+** well-defined interfaces need to be implemented
+
 * Way to optimize box volume and shape in addition to positions
 
 * Non-orthorhombic boxes (easiest with NEIGH_RVEC_F, I guess)

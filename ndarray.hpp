@@ -134,12 +134,21 @@ namespace mytest {
     return lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z;
   }
 
+  //! Vec3D cross product.
+  template<typename T>
+  Vec3D<T> cross(const Vec3D<T>& lhs, const Vec3D<T>& rhs) {
+    return Vec3D<T>(lhs.y * rhs.z - lhs.z * rhs.y,
+                    lhs.z * rhs.x - lhs.x * rhs.z,
+                    lhs.x * rhs.y - lhs.y * rhs.x);
+  }
+
   /*!
     A 3D vector (x,y,z).
   */
   template<typename T>
   class Vec3D {
     friend T dot<T>(const Vec3D<T>&, const Vec3D<T>&);
+    friend Vec3D<T> cross<T>(const Vec3D<T>&, const Vec3D<T>&);
     friend Vec3D<T> operator/<T>(const T&, Vec3D<T>);
   public:
     Vec3D();

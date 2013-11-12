@@ -105,6 +105,7 @@ class Box {
 protected:
   Box(int n, double lenx, double leny, double lenz, const string& lattice_type)
     : N(n), // Number of atoms.
+      nghosts(0), // No ghosts, yet
       box_size_(lenx, leny, lenz),
       coordinates_(N,3),
       types_(N),
@@ -116,15 +117,85 @@ protected:
 public:
   virtual ~Box() {}
 
+  /*! Return number of additional boxes in a, b, and c direction. */
+  Vec3D<unsigned> nshells(double cutoff) const { // TODO: PBC on/off  
+    // TODO: once we have general vectors use them.  
+    const Vec3D<double> a(box_size_[0], 0.0, 0.0);
+    const Vec3D<double> b(0.0, box_size_[1], 0.0);
+    const Vec3D<double> c(0.0, 0.0, box_size_[2]);
+    const Vec3D<double> bc = cross(b, c);
+    const Vec3D<double> ac = cross(a, c);
+    const Vec3D<double> ab = cross(a, b);
+    const double V = abs(dot(a, bc));
+    const double da = V / bc.abs();
+    const double db = V / ac.abs();
+    const double dc = V / ab.abs();
+    return Vec3D<unsigned>(ceil(cutoff/da),
+                           ceil(cutoff/db),
+                           ceil(cutoff/dc));
+  }
+
+  /*! Update ghost positions from central cell.
+
+    Assumes that the ghost coordinate array has the right size.
+  */
+  void update_ghosts(const Vec3D<unsigned>& shells) {
+    // TODO: once we have general vectors use them.  
+    const Vec3D<double> a(box_size_[0], 0.0, 0.0);
+    const Vec3D<double> b(0.0, box_size_[1], 0.0);
+    const Vec3D<double> c(0.0, 0.0, box_size_[2]);
+    unsigned ii = 0;
+    for (unsigned i = 0; i != N; ++i) {
+      (*ghost_coordinates_)(i, 0) = coordinates_(i, 0);
+      (*ghost_coordinates_)(i, 1) = coordinates_(i, 1);
+      (*ghost_coordinates_)(i, 2) = coordinates_(i, 2);
+      ++ii;
+    }
+    const int alo = -static_cast<int>(shells[0]);
+    const int ahi = shells[0];
+    const int blo = -static_cast<int>(shells[1]);
+    const int bhi = shells[1];
+    const int clo = -static_cast<int>(shells[2]);
+    const int chi = shells[2];
+    for (int aa = alo; aa <= ahi; ++aa)
+    for (int bb = blo; bb <= bhi; ++bb)
+    for (int cc = clo; cc <= chi; ++cc) {
+      if (aa == 0 && bb == 0 && cc == 0) continue;
+      for (unsigned i = 0; i != N; ++i) {
+        const Vec3D<double> offset = 1.0*aa*a + 1.0*bb*b + 1.0*cc*c;
+        (*ghost_coordinates_)(ii, 0) = coordinates_(i, 0) + offset[0];
+        (*ghost_coordinates_)(ii, 1) = coordinates_(i, 1) + offset[1];
+        (*ghost_coordinates_)(ii, 2) = coordinates_(i, 2) + offset[2];
+        ghost_types_[ii] = types_[i];
+        ++ii;
+      }
+    }
+  }
+
   void init_neighbor_list(double cutoff) {
+    const Vec3D<unsigned> shells = nshells(cutoff);
+    const unsigned new_nghosts =
+      N * ((2*shells[0]+1) * (2*shells[1]+1) * (2*shells[2]+1) - 1);
+    if (new_nghosts != nghosts) {
+      nghosts = new_nghosts;
+      ghost_coordinates_ = make_unique< Array2D<double> >(N+nghosts, 3);
+      ghost_types_.resize(N+nghosts);
+      update_ghosts(shells);
+    }
+    // Clear neighbor lists.
     for (auto& l : neigh_list)
       l.clear();
     for (auto& r : neigh_rvec)
       r.clear();
-    for (int i = 0; i != N; ++i)
-      for (int j = i+1; j != N; ++j) {
-        double dx, dy, dz;
-        if (dist(i,j, dx, dy, dz) < cutoff) {
+    // Fill neighbor lists again.
+    const double cutsq = cutoff * cutoff;
+    for (unsigned i = 0; i != N; ++i) {
+      // Go over neighbors in the central cell.
+      for (unsigned j = i+1; j != N; ++j) {
+        const double dx = coordinates_(j,0) - coordinates_(i,0);
+        const double dy = coordinates_(j,1) - coordinates_(i,1);
+        const double dz = coordinates_(j,2) - coordinates_(i,2);
+        if (dx*dx + dy*dy + dz*dz < cutsq) {
           neigh_list[i].push_back(j);
           neigh_list[j].push_back(i);
           neigh_rvec[i].push_back(dx);
@@ -135,10 +206,27 @@ public:
           neigh_rvec[j].push_back(-dz);
         }
       }
+      // Iterate over ghosts.
+      for (unsigned j = N; j != N+nghosts; ++j) {
+        const double dx = (*ghost_coordinates_)(j,0) - coordinates_(i,0);
+        const double dy = (*ghost_coordinates_)(j,1) - coordinates_(i,1);
+        const double dz = (*ghost_coordinates_)(j,2) - coordinates_(i,2);
+        if (dx*dx + dy*dy + dz*dz < cutsq) {
+          neigh_list[i].push_back(j);
+          neigh_rvec[i].push_back(dx);
+          neigh_rvec[i].push_back(dy);
+          neigh_rvec[i].push_back(dz);
+        }
+      }
+    }
   }
 
-  const int& natoms() const {
+  const unsigned& natoms() const {
     return N;
+  }
+
+  unsigned natoms_all() const {
+    return N+nghosts;
   }
 
   const Vec3D<double>& box_size() const {
@@ -153,8 +241,16 @@ public:
     return coordinates_;
   }
 
+  const Array2D<double>& ghost_coordinates() const {
+    return *ghost_coordinates_;
+  }
+
   const vector<int>& types() const {
     return types_;
+  }
+
+  const vector<int>& ghost_types() const {
+    return ghost_types_;
   }
 
   const string& lattice_type() const {
@@ -168,15 +264,17 @@ public:
   }
 
   double dist(int i, int j, double& dx, double& dy, double& dz) const {
-    dx = coordinates_(j,0) - coordinates_(i,0);
-    dy = coordinates_(j,1) - coordinates_(i,1);
-    dz = coordinates_(j,2) - coordinates_(i,2);
+    dx = (*ghost_coordinates_)(j,0) - coordinates_(i,0);
+    dy = (*ghost_coordinates_)(j,1) - coordinates_(i,1);
+    dz = (*ghost_coordinates_)(j,2) - coordinates_(i,2);
+    /*
     if (abs(dx) > 0.5 * box_size_[0])
       dx -= (dx/abs(dx))*box_size_[0];
     if (abs(dy) > 0.5 * box_size_[1])
       dy -= (dy/abs(dy))*box_size_[1];
     if (abs(dz) > 0.5 * box_size_[2])
       dz -= (dz/abs(dz))*box_size_[2];
+    */
     return sqrt(dx*dx + dy*dy + dz*dz);
   }
 
@@ -199,11 +297,33 @@ public:
            << 0 << " " << box_size_[1] << "\n"
            << 0 << " " << box_size_[2] << "\n"
            << "ITEM: ATOMS id type x y z\n";
-    for (int i = 0; i != N; ++i)
+    for (unsigned i = 0; i != N; ++i)
       myfile << i << " " << types_[i] << " "
              << coordinates_(i,0) << " "
              << coordinates_(i,1) << " "
              << coordinates_(i,2) << "\n";
+  }
+
+  const void write_to2(const string& filename) const {
+    ofstream myfile;
+    myfile.open(filename);
+    myfile << "ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n"
+           << N+nghosts
+           << "\nITEM: BOX BOUNDS pp pp pp\n"
+           << 0 << " " << box_size_[0] << "\n"
+           << 0 << " " << box_size_[1] << "\n"
+           << 0 << " " << box_size_[2] << "\n"
+           << "ITEM: ATOMS id type x y z\n";
+    for (unsigned i = 0; i != N; ++i)
+      myfile << i << " " << types_[i] << " "
+             << coordinates_(i,0) << " "
+             << coordinates_(i,1) << " "
+             << coordinates_(i,2) << "\n";
+    for (unsigned i = N; i != N+nghosts; ++i)
+      myfile << i << " " << 2 << " "
+             << (*ghost_coordinates_)(i,0) << " "
+             << (*ghost_coordinates_)(i,1) << " "
+             << (*ghost_coordinates_)(i,2) << "\n";
   }
 
   /// Scale box by a factor.
@@ -211,7 +331,7 @@ public:
     box_size_[0] *= factor_x;
     box_size_[1] *= factor_y;
     box_size_[2] *= factor_z;
-    for (int i = 0; i != N; ++i) {
+    for (unsigned i = 0; i != N; ++i) {
       coordinates_(i,0) *= factor_x;
       coordinates_(i,1) *= factor_y;
       coordinates_(i,2) *= factor_z;
@@ -231,7 +351,7 @@ public:
     box_size_[0] = x;
     box_size_[1] = y;
     box_size_[2] = z;
-    for (int i = 0; i != N; ++i) {
+    for (unsigned i = 0; i != N; ++i) {
       coordinates_(i,0) *= factor_x;
       coordinates_(i,1) *= factor_y;
       coordinates_(i,2) *= factor_z;
@@ -239,10 +359,13 @@ public:
   }
 
 protected:
-  const int N; // Number of atoms.
+  const unsigned N; // Number of atoms.
+  unsigned nghosts; // Number of ghost atoms.
   Vec3D<double> box_size_;
   Array2D<double> coordinates_;
+  unique_ptr< Array2D<double> > ghost_coordinates_;
   vector<int> types_;
+  vector<int> ghost_types_;
   vector< vector<int> > neigh_list;
   vector< vector<double> > neigh_rvec; // The inner vector is actually
                                        // an N*3 array.
@@ -261,7 +384,7 @@ public:
     coordinates_(1, 0) = 50.0 + r0/2;
     coordinates_(1, 1) = 50.0;
     coordinates_(1, 2) = 50.0;
-    for (int i = 0; i != N; ++i)
+    for (unsigned i = 0; i != N; ++i)
       types_[i] = 0;//i % 2; // Si and C mixed    TODO      
   }
 };
@@ -272,7 +395,7 @@ public:
   scBox(double a, int rx, int ry, int rz)
     : Box(rx*ry*rz, a*rx, a*ry, a*rz, "sc") // 1 atom in sc unit cell
   {
-    int i = 0;
+    unsigned i = 0;
     for (int x = 0; x != rx; ++x)
       for (int y = 0; y != ry; ++y)
         for (int z = 0; z != rz; ++z) {
@@ -293,7 +416,7 @@ public:
     : Box(2*rx*ry*rz, a*rx, a*ry, a*rz, "bcc") // 2 atoms in fcc unit cell
   {
     const double a2 = a / 2.0;
-    int i = 0;
+    unsigned i = 0;
     for (int x = 0; x != rx; ++x)
       for (int y = 0; y != ry; ++y)
         for (int z = 0; z != rz; ++z) {
@@ -317,7 +440,7 @@ public:
     : Box(4*rx*ry*rz, a*rx, a*ry, a*rz, "fcc") // 4 atoms in fcc unit cell
   {
     const double a2 = a / 2.0;
-    int i = 0;
+    unsigned i = 0;
     for (int x = 0; x != rx; ++x)
       for (int y = 0; y != ry; ++y)
         for (int z = 0; z != rz; ++z) {
@@ -349,7 +472,7 @@ public:
     const double a2 = a / 2.0;
     const double a4 = a / 4.0;
     const double a34 = 0.75 * a;
-    int i = 0;
+    unsigned i = 0;
     for (int x = 0; x != rx; ++x)
       for (int y = 0; y != ry; ++y)
         for (int z = 0; z != rz; ++z) {
@@ -390,7 +513,7 @@ public:
   NeighborListIterator(const Box& box, bool rvec)
     : i(0), b(box), has_rvec(rvec)
   {}
-  int i;
+  unsigned i;
   const Box& b;
   bool has_rvec;
 };
@@ -422,7 +545,8 @@ unique_ptr<Box> make_box(const string& lattice, double a,
 int get_neigh(void *kimmdl, int *mode, int* request,
               int *particle, int *numnei, const int **nei1particle,
               const double **rij) {
-  int status, i;
+  int status;
+  unsigned i;
   KIM_API_model& model = **( (KIM_API_model**)kimmdl );
   NeighborListIterator& iter =
     *( (NeighborListIterator*)model.get_data("neighObject", &status) );
@@ -552,11 +676,9 @@ public:
                           + string(" of file ") + string(__FILE__));
 
     // Set references to data for KIM.
-    model->setm_data(&status, 12*4,
+    model->setm_data(&status, 10*4,
                      "numberOfParticles", 1, &box_->natoms(), 1,
                      "numberParticleTypes", 1, &ntypes, 1,
-                     "particleTypes", natoms, &box_->types()[0], 1,
-                     "coordinates", 3*natoms, &box_->coordinates()(0,0), 1,
                      "cutoff", 1, &cutoff, 1,
                      "energy", 1, &energy, 1,
                      "forces", 3*natoms, &forces(0,0), 1,
@@ -572,15 +694,14 @@ public:
     }
 
     // Pass methods to KIM.
-    model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
+    status = model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
     if (status < KIM_STATUS_OK) {
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
     }
 
     // Init KIM model.
-    model->model_init();
-    model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
+    status = model->model_init();
     if (status < KIM_STATUS_OK) {
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
@@ -593,6 +714,18 @@ public:
     stop_time = clock();
     neighbor_time = double(stop_time - start_time) / CLOCKS_PER_SEC;
 
+    // Give ghost coordinates.
+    const int natoms_all = box_->natoms_all();
+    model->setm_data(&status, 2*4, //vvvvvv TODO: this is wrong!   
+                     "coordinates", 3*natoms_all, &box_->ghost_coordinates()(0,0), 1,
+                     "particleTypes", natoms_all, &box_->ghost_types()[0], 1
+                     );
+    if (status < KIM_STATUS_OK) {
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+    }
+
+
     // Store parameter names.
     free_parameters = get_free_parameters(*model);
   }
@@ -603,6 +736,7 @@ public:
     if (status < KIM_STATUS_OK)
       cout << string("KIM error in line ") + to_string(__LINE__)
         + string(" of file ") + string(__FILE__) << endl;
+    // TODO: this segfaults...     
     KIM_API_free(&model, &status);
     if (status < KIM_STATUS_OK)
       cout << string("KIM error in line ") + to_string(__LINE__)
@@ -728,7 +862,8 @@ public:
     double* coords = &c.box().coordinates()(0,0);
     const Vec3D<double>& box_size = c.box().box_size();
     for (unsigned i = 0; i != n; ++i)
-      coords[i] = pmod(x[i], box_size[i % 3]);
+      coords[i] = pmod(x[i], box_size[i % 3]); // TODO: we assume orthorhombic boxes!
+    c.box_->update_ghosts(c.box_->nshells(c.cutoff));
     c.compute();
     ++c.counter;
     // Fill gradient.
@@ -817,7 +952,8 @@ void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
 // Main ////////////////////////////////////////////////////////////////
 
 int main() {
-  Compute diamond(/*"diamond"*/"sc", 2.525/*5.429*/, true, true, KIM_mi_opbc_f);
+  Compute diamond("diamond", 5.429, true, true, KIM_mi_opbc_f);
+  //Compute diamond("sc", 2.525, true, true, KIM_mi_opbc_f);
   /*
   diamond.box().coordinates()(0,0) += 0.5;
   diamond.box().coordinates()(10,2) -= 0.7;
@@ -833,20 +969,23 @@ int main() {
   diamond.box().init_neighbor_list(diamond.get_cutoff());
   cout << "cutoff = " << diamond.get_cutoff() << endl;
   const vector< vector<int> >& neigh_list = diamond.box().get_neigh_list();
-  for (int i = 0; i != diamond.box().natoms(); ++i) {
+  for (unsigned i = 0; i != diamond.box().natoms(); ++i) {
     cout << "Neighbor distances of atom " << i << ":";
     map<string,int> hist;
     for (int j : neigh_list[i]) {
-      const double d = diamond.box().dist(0,j);
+      const double d = diamond.box().dist(i,j);
       char key[6];
       snprintf(key, 6, "%5.2f", d);
       string k(key);
       hist[k] += 1;
     }
     for (const auto& kv : hist)
-      cout << "  {" << kv.first << ": " << kv.second << "}";
+      cout << " {" << kv.first << ": " << kv.second << " }";
     cout << endl;
   }
+
+  diamond.compute();
+  cout << diamond.get_energy_per_atom() << " eV/atom" << endl;
 
   /*
   typedef pair<KIMNeigh,string> np;
