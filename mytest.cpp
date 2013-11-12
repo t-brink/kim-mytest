@@ -30,6 +30,7 @@
 #include <ctime>
 #include <memory>
 #include <map>
+//#include <algorithm>
 
 #include <KIM_API.h>
 #include <KIM_API_C.h>
@@ -116,6 +117,10 @@ public:
   virtual ~Box() {}
 
   void init_neighbor_list(double cutoff) {
+    for (auto& l : neigh_list)
+      l.clear();
+    for (auto& r : neigh_rvec)
+      r.clear();
     for (int i = 0; i != N; ++i)
       for (int j = i+1; j != N; ++j) {
         double dx, dy, dz;
@@ -468,7 +473,7 @@ class Compute {
 public:
   Compute(const string& lattice, double a,
           bool neigh_iterator, bool neigh_locator, KIMNeigh neighmode)
-    : box_(make_box(lattice, a, 3, 3, 3)),//8, 16, 32)),
+    : box_(make_box(lattice, a, 1, 1, 1)),//8, 16, 32)),
       iter(*box_, neighmode == KIM_neigh_rvec_f),
       natoms(box_->natoms()),
       ntypes(-1), // Will be set later in the constructor.
@@ -630,6 +635,10 @@ public:
     return 160.2177 * virial / V; // GPa
   }
 
+  double get_cutoff() const {
+    return cutoff;
+  }
+
   void set_param(const string& name, const string& elem1,
                  const string& elem2, const string& elem3, double value) {
     int status;
@@ -678,7 +687,7 @@ public:
     // Fill gradient.
     if (grad)
       throw runtime_error("Gradient not supported for box optimization.");
-    if (c.counter % 1 == 0) {
+    if (false && c.counter % 1 == 0) {
       cout << c.counter << "  " << c.energy << endl;
       c.box().write_to(string("dump.") + to_string(c.counter));
     }
@@ -728,7 +737,7 @@ public:
       for (unsigned i = 0; i != n; ++i)
         grad[i] = -f[i];
     }
-    if (c.counter % 1 == 0) {
+    if (false && c.counter % 1 == 0) {
       cout << c.counter << "  " << c.energy << endl;
       c.box().write_to(string("dump.") + to_string(c.counter));
     }
@@ -808,18 +817,36 @@ void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
 // Main ////////////////////////////////////////////////////////////////
 
 int main() {
-  Compute diamond("diamond", 4.0/*5.429*/, true, true, KIM_mi_opbc_f);
+  Compute diamond(/*"diamond"*/"sc", 2.525/*5.429*/, true, true, KIM_mi_opbc_f);
   /*
   diamond.box().coordinates()(0,0) += 0.5;
   diamond.box().coordinates()(10,2) -= 0.7;
   diamond.box().coordinates()(30,1) += 0.2;
   diamond.minimize_positions(0.0001, 10000);
   */
-  diamond.minimize_box(0.00001, 10000);
+  //diamond.minimize_box(0.00001, 10000);
   cout << "Lattice constants:" << endl;
-  cout << " a = " << diamond.box().box_size()[0] / 3 << endl;
-  cout << " b = " << diamond.box().box_size()[1] / 3 << endl;
-  cout << " c = " << diamond.box().box_size()[2] / 3 << endl;
+  cout << " a = " << diamond.box().box_size()[0] / 1 << endl;
+  cout << " b = " << diamond.box().box_size()[1] / 1 << endl;
+  cout << " c = " << diamond.box().box_size()[2] / 1 << endl;
+
+  diamond.box().init_neighbor_list(diamond.get_cutoff());
+  cout << "cutoff = " << diamond.get_cutoff() << endl;
+  const vector< vector<int> >& neigh_list = diamond.box().get_neigh_list();
+  for (int i = 0; i != diamond.box().natoms(); ++i) {
+    cout << "Neighbor distances of atom " << i << ":";
+    map<string,int> hist;
+    for (int j : neigh_list[i]) {
+      const double d = diamond.box().dist(0,j);
+      char key[6];
+      snprintf(key, 6, "%5.2f", d);
+      string k(key);
+      hist[k] += 1;
+    }
+    for (const auto& kv : hist)
+      cout << "  {" << kv.first << ": " << kv.second << "}";
+    cout << endl;
+  }
 
   /*
   typedef pair<KIMNeigh,string> np;
