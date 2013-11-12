@@ -35,6 +35,8 @@
 #include <KIM_API_C.h>
 #include <KIM_API_status.h>
 
+#include <nlopt.hpp>
+
 #include "ndarray.hpp"
 
 using namespace std;
@@ -84,6 +86,11 @@ const string KIM_DESC =
 template<typename T, typename ...Args>
 std::unique_ptr<T> make_unique(Args&& ...args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+/// Modulo with the same semantics as python (or maths).
+double pmod(double x, double N) {
+  return (x < 0) ? fmod(fmod(x, N) + N, N) : fmod(x, N);
 }
 
 // Data structures /////////////////////////////////////////////////////
@@ -137,7 +144,7 @@ public:
     return box_size_[0] * box_size_[1] * box_size_[2];
   }
 
-  const Array2D<double>& coordinates() const {
+  Array2D<double>& coordinates() {
     return coordinates_;
   }
 
@@ -461,14 +468,15 @@ class Compute {
 public:
   Compute(const string& lattice, double a,
           bool neigh_iterator, bool neigh_locator, KIMNeigh neighmode)
-    : box_(make_box(lattice, a, 8, 16, 32)),
+    : box_(make_box(lattice, a, 10, 3, 3)),//8, 16, 32)),
       iter(*box_, neighmode == KIM_neigh_rvec_f),
       natoms(box_->natoms()),
       ntypes(-1), // Will be set later in the constructor.
       forces(natoms, 3),
       particleEnergy(natoms),
       virial(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-      particleVirial(natoms, 6)
+      particleVirial(natoms, 6),
+      counter(0)
   {
     int status;
     clock_t start_time, stop_time;
@@ -656,6 +664,62 @@ public:
     model->model_reinit();
   }
 
+  //! Objective function for fitting.
+  static double objective(unsigned n, const double* x, double* grad,
+                          void* f_data) {
+    Compute& c = *(static_cast<Compute*>(f_data));
+    // Write back all positions.  TODO: We assume the neighbor lists
+    // don't change.  
+    double* coords = &c.box().coordinates()(0,0);
+    const Vec3D<double>& box_size = c.box().box_size();
+    for (unsigned i = 0; i != n; ++i)
+      coords[i] = pmod(x[i], box_size[i % 3]);
+    c.compute();
+    ++c.counter;
+    // Fill gradient.
+    if (grad) {
+      const double* f = &c.forces(0,0);
+      for (unsigned i = 0; i != n; ++i)
+        grad[i] = -f[i];
+    }
+    if (c.counter % 1 == 0) {
+      cout << c.counter << "  " << c.energy << endl;
+      c.box().write_to(string("dump.") + to_string(c.counter));
+    }
+    return c.energy;
+  }
+
+  //! Minimize atomic positions.
+  double minimize_positions(double ftol_abs, int maxeval) {
+    // Get coordinates as vector.
+    Array2D<double>& coords = box_->coordinates();
+    const int nparams = coords.extent(0)*coords.extent(1);
+    const double* p = &coords(0,0);
+    vector<double> coord_vec(p, p+nparams);
+    // Other good algorithms:
+    //   * NLOPT_LD_LBFGS
+    //   * NLOPT_LD_TNEWTON_PRECOND_RESTART
+    //   * NLOPT_LD_VAR2
+    double obj_val;
+    nlopt::opt optimizer(nlopt::LD_TNEWTON_PRECOND_RESTART, nparams);
+    optimizer.set_min_objective(Compute::objective, this);
+    counter = 0;
+    optimizer.set_maxeval(maxeval);
+    optimizer.set_ftol_abs(ftol_abs);
+    optimizer.optimize(coord_vec, obj_val);
+    cout << obj_val << " in " << counter << " steps." << endl;
+    counter = 0;
+    return obj_val;
+  }
+
+  double minimize_positions(double ftol_abs) {
+    return minimize_positions(ftol_abs, 10000);
+  }
+
+  double minimize_positions() {
+    return minimize_positions(0.0001);
+  }
+
 private:
   unique_ptr<Box> box_;
   NeighborListIterator iter;
@@ -669,6 +733,7 @@ private:
   double neighbor_time;
   vector<string> free_parameters; /// Names of the free parameters.
   map<const string,int> partcl_type_codes;
+  unsigned counter;
 };
 
 
@@ -697,6 +762,23 @@ void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
 // Main ////////////////////////////////////////////////////////////////
 
 int main() {
+  Compute diamond("diamond", 5.429, true, true, KIM_mi_opbc_f);
+  for (int i = 0; i != diamond.box().natoms(); ++i) {
+    diamond.box().coordinates()(i,0) += 500;
+    //diamond.box().coordinates()(i,1) += 500;
+    //diamond.box().coordinates()(i,2) += 500;
+  }
+  /*
+  diamond.box().coordinates()(0,0) += 0.5;
+  diamond.box().coordinates()(10,2) -= 0.7;
+  diamond.box().coordinates()(30,1) += 0.2;
+  */
+  Vec3D<double>& bs = const_cast<Vec3D<double>&>(diamond.box().box_size());
+  bs[0] = 1000.0;
+  //bs[1] = 1000.0;
+  //bs[2] = 1000.0;
+  diamond.minimize_positions(0.0001, 10000);
+
   /*
   typedef pair<KIMNeigh,string> np;
   vector<np> neigh_modes = {
@@ -717,6 +799,7 @@ int main() {
   }
   */
 
+  /*
   ofstream outfile;
   outfile.open("diamond.bulkmod.dat");
   outfile << "# V             E           factor\n"
@@ -725,7 +808,7 @@ int main() {
   const clock_t start_time = clock();
   Compute diamond("diamond", 5.429, true, true, KIM_mi_opbc_f);
   const Vec3D<double> size0 = diamond.box().box_size();
-  /*int j = 0;*/
+  //int j = 0;
   const double deviation = 0.15; // min = 1 - deviation, max = 1 + deviation
   const int halfsteps = 10; // halfsteps*2 + 1 = real steps
   for (int i = -halfsteps; i <= halfsteps; ++i) {
@@ -739,15 +822,14 @@ int main() {
             << " "
             << factor
             << endl;
-    /*
-    const string dumpname = string("dump.") + to_string(j++);
-    diamond.box().write_to(dumpname);
-    */
+    //const string dumpname = string("dump.") + to_string(j++);
+    //diamond.box().write_to(dumpname);
   }
   const clock_t stop_time = clock();
   cout << "done in "
        << double(stop_time - start_time) / CLOCKS_PER_SEC
        <<" s, written to diamond.bulkmod.dat" << endl;
+  */
 
   return 0;
 }

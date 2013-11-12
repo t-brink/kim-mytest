@@ -1,3 +1,30 @@
+* Way to optimize box volume and shape in addition to positions
+
+* Non-orthorhombic boxes (easiest with NEIGH_RVEC_F, I guess)
+
+* Small boxes (the minimum image convention I use now only works if
+   the box is bigger than the cutoff (or 2*cutoff even?))
+
+* bulk modulus curves with relaxation
+* elastic constants (stiffness tensor)
+
+* All in all the following properties should be calculated for
+   different lattices:
+** cohesive energy
+** lattice constant(s) and atomic positions
+** bulk modulus with and without atomic relaxation
+** stiffness tensor with and without atomic relaxation
+** surface properties
+*** relaxation, stress, energy
+
+* make it possible to do this all with different neighbor list methods
+
+* clean up class interfaces
+** if we can get a non-const reference anyway, we don't need a method
+   to get it, just make it public
+
+* Monte-Carlo
+
 * Array1D to match Array2D, Array3D, ...
 
 * Dynamic choice of model
