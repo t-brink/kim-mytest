@@ -468,7 +468,7 @@ class Compute {
 public:
   Compute(const string& lattice, double a,
           bool neigh_iterator, bool neigh_locator, KIMNeigh neighmode)
-    : box_(make_box(lattice, a, 10, 3, 3)),//8, 16, 32)),
+    : box_(make_box(lattice, a, 3, 3, 3)),//8, 16, 32)),
       iter(*box_, neighmode == KIM_neigh_rvec_f),
       natoms(box_->natoms()),
       ntypes(-1), // Will be set later in the constructor.
@@ -664,7 +664,53 @@ public:
     model->model_reinit();
   }
 
-  //! Objective function for fitting.
+  //! Objective function for fitting box extents.
+  static double objective_box(unsigned n, const double* x, double* grad,
+                              void* f_data) {
+    Compute& c = *(static_cast<Compute*>(f_data));
+    // Scale box.  TODO: We assume the neighbor lists don't change.   
+    if (n != 3)
+      throw runtime_error("This objective function only works with "
+                          "3 parameters.");
+    c.box().scale_to(x[0], x[1], x[2]);
+    c.compute();
+    ++c.counter;
+    // Fill gradient.
+    if (grad)
+      throw runtime_error("Gradient not supported for box optimization.");
+    if (c.counter % 1 == 0) {
+      cout << c.counter << "  " << c.energy << endl;
+      c.box().write_to(string("dump.") + to_string(c.counter));
+    }
+    return c.energy;
+  }
+
+  //! Minimize box shape, no constraints.  TODO: non-ortho
+  double minimize_box(double ftol_abs, int maxeval) {
+    // The box extends are our parameters.
+    vector<double> size = {
+      box_->box_size()[0], box_->box_size()[1], box_->box_size()[2]
+    };
+    vector<double> lb = { 0.0, 0.0, 0.0 };
+    // TODO: We use a gradient-free algorithm for now, although the
+    // gradient should be obtainable from the virial (is it even
+    // exactly the virial?).
+    double obj_val;
+    nlopt::opt optimizer(nlopt::LN_SBPLX, 3);
+    optimizer.set_min_objective(Compute::objective_box, this);
+    optimizer.set_lower_bounds(lb); // It is a box size, may only be
+                                    // positive.
+    optimizer.set_initial_step(0.05); // This may not be too big!  
+    counter = 0;
+    optimizer.set_maxeval(maxeval);
+    optimizer.set_ftol_abs(ftol_abs);
+    optimizer.optimize(size, obj_val);
+    cout << obj_val << " in " << counter << " steps." << endl;
+    counter = 0;
+    return obj_val;
+  }
+
+  //! Objective function for fitting atomic positions.
   static double objective(unsigned n, const double* x, double* grad,
                           void* f_data) {
     Compute& c = *(static_cast<Compute*>(f_data));
@@ -762,22 +808,18 @@ void print_structure(const string& lattice, double a, KIMNeigh neighmode) {
 // Main ////////////////////////////////////////////////////////////////
 
 int main() {
-  Compute diamond("diamond", 5.429, true, true, KIM_mi_opbc_f);
-  for (int i = 0; i != diamond.box().natoms(); ++i) {
-    diamond.box().coordinates()(i,0) += 500;
-    //diamond.box().coordinates()(i,1) += 500;
-    //diamond.box().coordinates()(i,2) += 500;
-  }
+  Compute diamond("diamond", 4.0/*5.429*/, true, true, KIM_mi_opbc_f);
   /*
   diamond.box().coordinates()(0,0) += 0.5;
   diamond.box().coordinates()(10,2) -= 0.7;
   diamond.box().coordinates()(30,1) += 0.2;
-  */
-  Vec3D<double>& bs = const_cast<Vec3D<double>&>(diamond.box().box_size());
-  bs[0] = 1000.0;
-  //bs[1] = 1000.0;
-  //bs[2] = 1000.0;
   diamond.minimize_positions(0.0001, 10000);
+  */
+  diamond.minimize_box(0.00001, 10000);
+  cout << "Lattice constants:" << endl;
+  cout << " a = " << diamond.box().box_size()[0] / 3 << endl;
+  cout << " b = " << diamond.box().box_size()[1] / 3 << endl;
+  cout << " c = " << diamond.box().box_size()[2] / 3 << endl;
 
   /*
   typedef pair<KIMNeigh,string> np;
