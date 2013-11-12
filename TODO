@@ -1,18 +1,22 @@
 * Neighborlists using ghost atoms are somewhat implemented
 ** still support MI_OPBC_F *if* box is orthorhombic
+*** Should use ghostless neighbor lists
+** disable neighbor lists when using cluster
 ** correctly feed the ghost atoms to KIM, this is still somewhat
    segfault-heavy :-(
-** take care to update ghost atoms and neighborlists at appropriate times
+*** the LAMMPS plugin passes number of atoms + number of ghosts as
+   numberOfParticles, when only providing iterator access to neighbors
+   this may be acceptable
+** take care to update ghost atoms and neighborlists at appropriate
+   times
+** neighbor lists need "skin"
 
 * organize everything in a readable and maintainable way
 ** well-defined interfaces need to be implemented
 
 * Way to optimize box volume and shape in addition to positions
 
-* Non-orthorhombic boxes (easiest with NEIGH_RVEC_F, I guess)
-
-* Small boxes (the minimum image convention I use now only works if
-   the box is bigger than the cutoff (or 2*cutoff even?))
+* Non-orthorhombic boxes
 
 * bulk modulus curves with relaxation
 * elastic constants (stiffness tensor)
