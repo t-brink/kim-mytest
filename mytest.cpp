@@ -189,9 +189,26 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
                         "must be smaller than half the smallest box side "
                         "length.");
   ghost_shells = calc_number_of_ghost_shells(cut);
-  const unsigned new_nghosts = natoms_ * ((2*ghost_shells[0]+1)
-                                          * (2*ghost_shells[1]+1)
-                                          * (2*ghost_shells[2]+1) - 1);
+  Vec3D<unsigned> tmp_shells = ghost_shells;
+  unsigned new_nghosts;
+  switch (kim_neighbor_mode) {
+  case KIM_cluster:
+  case KIM_mi_opbc_f:
+  case KIM_neigh_pure_f:
+    // For these we store any ghost atoms that we may need.
+    new_nghosts = natoms_ * ((2*ghost_shells[0]+1)
+                             * (2*ghost_shells[1]+1)
+                             * (2*ghost_shells[2]+1) - 1);
+    break;
+  case KIM_neigh_rvec_f:
+    // Here the ghost atoms are only needed during neighbor list
+    // calculation and are not stored.
+    new_nghosts = 0;
+    ghost_shells[0] = 0; ghost_shells[1] = 0; ghost_shells[2] = 0;
+    break;
+  default:
+    throw runtime_error("unsupported neighbor list mode.");
+  }
   // If needed, resize ghost arrays. If the arrays are not yet
   // allocated, allocate them (ghost_position == nullptr).
   bool reallocated = false;
@@ -243,7 +260,6 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
     }
     break;
   case KIM_neigh_pure_f:
-  case KIM_neigh_rvec_f:
     {
       // Fill neighbor lists again.
       const double cutsq = cut * cut;
@@ -280,6 +296,60 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
             }
           }
         }
+      }
+    }
+    break;
+  case KIM_neigh_rvec_f:
+    {
+      // Fill neighbor lists again.
+      const double cutsq = cut * cut;
+      for (unsigned i = 0; i != natoms_; ++i) {
+        // Go over neighbors in the central cell.
+        for (unsigned j = i+1; j != natoms_; ++j) {
+          const double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
+          const double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
+          const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
+          if (dx*dx + dy*dy + dz*dz < cutsq) {
+            neigh_list_[i].push_back(j);
+            neigh_list_[j].push_back(i);
+            if (kim_neighbor_mode == KIM_neigh_rvec_f) {
+              neigh_rvec_[i].push_back(dx);
+              neigh_rvec_[i].push_back(dy);
+              neigh_rvec_[i].push_back(dz);
+              neigh_rvec_[j].push_back(-dx);
+              neigh_rvec_[j].push_back(-dy);
+              neigh_rvec_[j].push_back(-dz);
+            }
+          }
+        }
+        // Iterate over ghosts.
+        const int alo = -static_cast<int>(tmp_shells[0]);
+        const int ahi = tmp_shells[0];
+        const int blo = -static_cast<int>(tmp_shells[1]);
+        const int bhi = tmp_shells[1];
+        const int clo = -static_cast<int>(tmp_shells[2]);
+        const int chi = tmp_shells[2];
+        for (int aa = alo; aa <= ahi; ++aa)
+          for (int bb = blo; bb <= bhi; ++bb)
+            for (int cc = clo; cc <= chi; ++cc) {
+              if (aa == 0 && bb == 0 && cc == 0) continue;
+              const Vec3D<double> offset =
+                double(aa)*a + double(bb)*b + double(cc)*c;
+              for (unsigned j = 0; j != natoms_; ++j) {
+                const double dx =
+                  (*ghost_positions)(j,0) - (*ghost_positions)(i,0) + offset[0];
+                const double dy =
+                  (*ghost_positions)(j,1) - (*ghost_positions)(i,1) + offset[1];
+                const double dz =
+                  (*ghost_positions)(j,2) - (*ghost_positions)(i,2) + offset[2];
+                if (dx*dx + dy*dy + dz*dz < cutsq) {
+                  neigh_list_[i].push_back(j);
+                  neigh_rvec_[i].push_back(dx);
+                  neigh_rvec_[i].push_back(dy);
+                  neigh_rvec_[i].push_back(dz);
+                }
+              }
+            }
       }
     }
     break;
@@ -628,11 +698,11 @@ void Compute::compute() {
       }
       break;
     case KIM_mi_opbc_f:
-      // This one has no ghost atoms.
+    case KIM_neigh_rvec_f:
+      // These have no ghost atoms.
       throw runtime_error("this should never happen: there are ghost atoms "
                           "although we use MI_OPBC_F.");
     case KIM_neigh_pure_f:
-    case KIM_neigh_rvec_f:
       for (unsigned i = box_->natoms; i != box_->nall; ++i) {
         const unsigned central = i % box_->natoms;
         particleEnergy[central] += particleEnergy[i];
