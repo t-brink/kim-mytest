@@ -27,7 +27,10 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <map>
 #include <memory>
+
+#include <KIM_API.h>
 
 #include "ndarray.hpp"
 
@@ -396,8 +399,7 @@ namespace mytest {
     /** Calculate the number of ghost atom shells needed. */
     Vec3D<unsigned> calc_number_of_ghost_shells(double cutoff) const;
 
-  //private:    
-  public:
+  private:
     Vec3D<double> box_side_lengths_;
     Vec3D<double> a_, b_, c_;
     Vec3D<bool> periodic_;
@@ -408,6 +410,46 @@ namespace mytest {
     std::unique_ptr< Array1D<int> > ghost_types;
     std::vector< std::vector<int> > neigh_list_;
     std::vector< std::vector<double> > neigh_rvec_;
+  };
+
+
+  /** Main interface class.
+
+      This class contains a simulation box and interacts with KIM.
+  */
+  class Compute {
+  public:
+    /** General constructor.
+
+        Take a simulation box and a neighbor mode and prepare KIM.
+
+        @param box The simulation box. This class takes possession of
+                   the pointer.
+        @param modelname KIM model identifier.
+        @param neighmode The neighbor list mode.
+     */
+    Compute(std::unique_ptr<Box> box, const std::string& modelname,
+            KIMNeigh neighmode);
+
+    /** Compute values using KIM. */
+    void compute();
+
+    /** Get the computed potential energy of the box. */
+    double get_energy() const;
+
+    /** Get the computed potential energy per atom of the box. */
+    double get_energy_per_atom() const;
+
+  private:
+    std::unique_ptr<Box> box_;
+    KIM_API_model* model;
+    // Model constants.
+    int ntypes;
+    std::map<const std::string,int> partcl_type_codes;
+    double cutoff;
+    // Computation results.
+    double energy;
+    std::unique_ptr< Array2D<double> > forces;
   };
 
 }
