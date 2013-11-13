@@ -152,6 +152,16 @@ namespace mytest {
     */
     void update_ghosts();
 
+    /** Update distance vectors.
+
+        Call this after changing the atom positions when using
+        NEIGH_RVEC_F. This implicitly calls update_ghosts().
+
+        Calling this method is cheaper than re-calcuting the neighbor
+        list with update_neighbor_list().
+    */
+    void update_ghost_rvecs();
+
     // Public data /////////////////////////////////////////////////////
 
     /** Constant reference to box side lengths.

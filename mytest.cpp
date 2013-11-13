@@ -321,6 +321,23 @@ void Box::update_ghosts() {
 }
 
 
+void Box::update_ghost_rvecs() {
+  update_ghosts();
+  if (kim_neighbor_mode == KIM_neigh_rvec_f)
+    for (unsigned i = 0; i != natoms_; ++i) {
+      const unsigned jjmax = neigh_list_[i].size();
+      const auto& neigh_i = neigh_list_[i];
+      auto& rvec_i = neigh_rvec_[i];
+      for (unsigned jj = 0; jj != jjmax; ++jj) {
+        const unsigned j = neigh_i[jj];
+        rvec_i[jj*3 + 0] = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
+        rvec_i[jj*3 + 1] = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
+        rvec_i[jj*3 + 2] = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
+      }
+    }
+}
+
+
 double Box::calc_dist(int i, int j, double& dx, double& dy, double& dz) const {
   if (!ghost_positions)
     throw runtime_error("Ghosts no initialized!");
@@ -612,8 +629,8 @@ void Compute::compute() {
       break;
     case KIM_mi_opbc_f:
       // This one has no ghost atoms.
-      cout << "HUH???" << endl;
-      break;
+      throw runtime_error("this should never happen: there are ghost atoms "
+                          "although we use MI_OPBC_F.");
     case KIM_neigh_pure_f:
     case KIM_neigh_rvec_f:
       for (unsigned i = box_->natoms; i != box_->nall; ++i) {
