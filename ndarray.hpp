@@ -28,6 +28,15 @@
 #include <cmath>
 #include <stdexcept>
 
+/***********************************************************************
+ * TODO:
+ *
+ *   - unsigned vs signed
+ *   - copy and move constructors
+ *   - move implementations out of the class definition (see Vec3D)
+ *   - implement a size() function (multiply all extents)
+ ***********************************************************************/
+
 namespace mytest {
   // Some common integer powers. /////////////////////////////////////////
   template<typename T>
@@ -468,6 +477,76 @@ namespace mytest {
     @todo: move inline member functions out of the class definition like above.
   */
   template<typename T>
+  class Array1D {
+  public:
+    //! External memory management.
+    explicit Array1D(T* data, int size)
+      : data(data), size_(size),
+        keep_data(true)
+    {}
+
+    //! Manage data by the class.
+    explicit Array1D(int size)
+      : data(static_cast<T*>(std::malloc(size*sizeof(T)))),
+        size_(size),
+        keep_data(false)
+    {}
+
+    //! Move constructor.
+    Array1D(Array1D<T>&& other)
+      : data(other.data),
+        size_(other.size_),
+        keep_data(other.keep_data)
+    {
+      other.keep_data = true; // Avoid double-freeing memory.
+    }
+
+    ~Array1D() {
+      if (!keep_data)
+        std::free(data);
+    }
+
+    //! Return size of array in dimension e (0 is the first dimension).
+    int extent(int e) const {
+      switch(e) {
+      case 0:
+        return size_;
+      default:
+        throw std::out_of_range("e must be 0");
+      }
+    }
+
+    T& operator()(int i) {
+      //TODO: range check??
+      return data[i];
+    }
+    const T& operator()(int i) const {
+      //TODO: range check??
+      return data[i];
+    }
+
+    Array1D<T>& operator*=(const T& rhs) {
+      for (int i = 0; i != size_; ++i)
+        data[i] *= rhs;
+      return *this;
+    }
+
+  private:
+    T* data;
+    int size_;
+    bool keep_data;
+
+    // Do not use!
+    Array1D& operator=(const Array1D&) {}
+  };
+
+
+  /*!
+    This wraps a pointer to type T to be used as a 2D array.
+
+    @todo: move inline member functions out of the class definition like above.
+  */
+  template<typename T>
   class Array2D {
   public:
     //! External memory management.
@@ -482,6 +561,15 @@ namespace mytest {
         extent_outer(extent_outer), extent_inner(extent_inner),
         keep_data(false)
     {}
+
+    //! Move constructor.
+    Array2D(Array2D<T>&& other)
+      : data(other.data),
+        extent_outer(other.extent_outer), extent_inner(other.extent_inner),
+        keep_data(other.keep_data)
+    {
+      other.keep_data = true; // Avoid double-freeing memory.
+    }
 
     ~Array2D() {
       if (!keep_data)
@@ -546,6 +634,16 @@ namespace mytest {
         fac_i(extent1*extent2),
         keep_data(false)
     {}
+
+    //! Move constructor.
+    Array3D(Array3D<T>&& other)
+      : data(other.data),
+        extent0(other.extent0), extent1(other.extent1), extent2(other.extent2),
+        fac_i(other.fac_i),
+        keep_data(other.keep_data)
+    {
+      other.keep_data = true; // Avoid double-freeing memory.
+    }
 
     ~Array3D() {
       if (!keep_data)
@@ -635,6 +733,17 @@ namespace mytest {
         fac_j(extent2*extent3),
         keep_data(false)
     {}
+
+    //! Move constructor.
+    Array4D(Array4D<T>&& other)
+      : data(other.data),
+        extent0(other.extent0), extent1(other.extent1),
+        extent2(other.extent2), extent3(other.extent3),
+        fac_i(other.fac_i), fac_j(other.fac_j),
+        keep_data(other.keep_data)
+    {
+      other.keep_data = true; // Avoid double-freeing memory.
+    }
 
     ~Array4D() {
       if (!keep_data)
