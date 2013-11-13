@@ -526,6 +526,14 @@ namespace mytest {
                          const int* mode, const int* request,
                          int* particle, int* numnei, int** nei1particle,
                          double** rij);
+
+    /** Update the neighbor list and re-register any changed arrays to
+        KIM.
+
+        Call after atom positions have changed more than the cutoff
+        skin or if the cutoff has changed (increased).
+    */
+    void update_neighbor_list();
   };
 
 }

@@ -651,24 +651,9 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                         + string(" of file ") + string(__FILE__));
 
   // Now that we know the cutoff, we calculate neighbor lists and
-  // ghost atoms.  TODO: For now the skin is 0.
-  box_->update_neighbor_list(cutoff, 0.0);
-
-  // Allocate memory for variable length data and pass it to KIM.
-  const unsigned n = box_->nall;
-  forces.resize(3 * n);
-  particleEnergy.resize(n);
-  particleVirial.resize(6 * n);
-  model->setm_data(&status, 5*4, // TODO: use indices!
-                   "coordinates",    3*n, box_->get_positions_ptr(), 1,
-                   "particleTypes",    n, box_->get_types_ptr(),     1,
-                   "forces",         3*n, &forces[0],                1,
-                   "particleEnergy",   n, &particleEnergy[0],        1,
-                   "particleVirial", 6*n, &particleVirial[0],        1
-                   );
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
+  // ghost atoms.  Then we allocate memory for variable length data
+  // and pass it to KIM.
+  update_neighbor_list();
 }
 
 
@@ -785,6 +770,27 @@ int Compute::get_neigh(KIM_API_model** kimmdl,
   return KIM_STATUS_OK;
 }
 
+void Compute::update_neighbor_list() {
+  int status;
+  // TODO: For now the skin is 0.
+  const bool arrays_changed = box_->update_neighbor_list(cutoff, 0.0);
+  if (arrays_changed) {
+    const unsigned n = box_->nall;
+    forces.resize(3 * n);
+    particleEnergy.resize(n);
+    particleVirial.resize(6 * n);
+    model->setm_data(&status, 5*4, // TODO: use indices!
+                     "coordinates",    3*n, box_->get_positions_ptr(), 1,
+                     "particleTypes",    n, box_->get_types_ptr(),     1,
+                     "forces",         3*n, &forces[0],                1,
+                     "particleEnergy",   n, &particleEnergy[0],        1,
+                     "particleVirial", 6*n, &particleVirial[0],        1
+                     );
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+  }
+}
 
 
 
