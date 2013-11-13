@@ -83,14 +83,14 @@ namespace mytest {
         @param types Unique pointer to n component array containing
                      the atom types. Must have the same length as the
                      first dimension of @p coordinates.
-        @param neigh_list Support neighbor list?
+        @param neighmode The neighbor list mode.
         @param name A name for the box.
     */
     Box(const Vec3D<double>& a, const Vec3D<double>& b, const Vec3D<double>& c,
         bool periodic_a, bool periodic_b, bool periodic_c,
         std::unique_ptr< Array2D<double> > coordinates,
         std::unique_ptr< Array1D<int> > types,
-        bool neigh_list, const std::string& name);
+        KIMNeigh neighmode, const std::string& name);
 
     /** Lattice constructor.
 
@@ -117,7 +117,7 @@ namespace mytest {
         @param types The types of the atoms on the lattice. The length
                      of this array must match the basis of the given
                      lattice.
-        @param neigh_list Support neighbor list?
+        @param neighmode The neighbor list mode.
         @param name A name for the box.
 
         @todo: lattices with c != a.
@@ -126,7 +126,7 @@ namespace mytest {
         unsigned repeat_a, unsigned repeat_b, unsigned repeat_c,
         bool periodic_a, bool periodic_b, bool periodic_c,
         const std::vector<int>& types,
-        bool neigh_list, const std::string& name);
+        KIMNeigh neighmode, const std::string& name);
 
     virtual ~Box() {}
 
@@ -204,6 +204,9 @@ namespace mytest {
         periodic in ±a, ±b, and ±c direction.
     */
     const Vec3D<bool>& periodic;
+
+    /** The KIM neighbor mode supported by this box. */
+    const KIMNeigh kim_neighbor_mode;
 
     /** Number of atoms without ghost atoms. */
     const unsigned& natoms;
@@ -387,6 +390,9 @@ namespace mytest {
         identity matrix: ε<sub>ij</sub> + δ<sub>ij</sub>.
 
         @param defmatrix The deformation matrix in Voigt notation.
+
+        @todo Take care that the box stays orthorhombic if
+              kim_neighbor_mode is KIM_mi_opbc_f.
     */
     void deform(const Voigt6<double>& defmatrix);
 
@@ -397,6 +403,9 @@ namespace mytest {
         @param new_a The new box vector a.
         @param new_b The new box vector b.
         @param new_c The new box vector c.
+
+        @todo Take care that the box stays orthorhombic if
+              kim_neighbor_mode is KIM_mi_opbc_f.
     */
     void deform_to(const Vec3D<double>& new_a,
                    const Vec3D<double>& new_b,
@@ -447,10 +456,8 @@ namespace mytest {
         @param box The simulation box. This class takes possession of
                    the pointer.
         @param modelname KIM model identifier.
-        @param neighmode The neighbor list mode.
      */
-    Compute(std::unique_ptr<Box> box, const std::string& modelname,
-            KIMNeigh neighmode);
+    Compute(std::unique_ptr<Box> box, const std::string& modelname);
 
     /** Compute values using KIM. */
     void compute();
