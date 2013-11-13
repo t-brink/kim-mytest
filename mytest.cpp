@@ -387,29 +387,29 @@ static const string KIM_DESC =
 
 Compute::Compute(unique_ptr<Box> box, const string& modelname,
                  KIMNeigh neighmode)
-  : box_(move(box))
+  : box_(move(box)), neighbor_mode(neighmode)
 {
   int status;
 
   // Assemble KIM descriptor file.
-  //
-  // We only do Neigh_IterAccess because with ghost atoms there is no
-  // way to tell the model with a full neighbor list which atoms are
-  // ghost atoms and which are not.
   string descriptor = KIM_DESC;
-  descriptor += "Neigh_IterAccess  flag\n";
+  descriptor += "Neigh_LocaAccess  flag\n";
   switch (neighmode) {
   case KIM_cluster:
     descriptor += "CLUSTER           flag\n";
+    kim_wants_rvec = false;
     break;
   case KIM_mi_opbc_f:
     descriptor += "MI_OPBC_F         flag\n";
+    kim_wants_rvec = false;
     break;
   case KIM_neigh_pure_f:
     descriptor += "NEIGH_PURE_F      flag\n";
+    kim_wants_rvec = false;
     break;
   case KIM_neigh_rvec_f:
     descriptor += "NEIGH_RVEC_F      flag\n";
+    kim_wants_rvec = true;
     break;
   default:
     throw runtime_error("Unsupported neighbor list mode.");
@@ -450,43 +450,167 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname,
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
 
-  // Set references to data for KIM.
-  model->setm_data(
-      &status, 10*4,
-      "numberOfParticles",        1, &box_->natoms,        1,
-      "numberParticleTypes",      1, &ntypes,              1,
-      "cutoff",                   1, &cutoff,              1,
-      "energy",                   1, &energy,              1,
-      "forces",       3*box->natoms, &(*forces)(0,0),      1,
-      "particleEnergy", box->natoms, &particleEnergy[0],   1,
-      "virial",                   6, &virial(0),           1,
-      "particleVirial",    6*natoms, &particleVirial(0,0), 1,
-      "neighObject",              1, &iter,                1,
-      "boxSideLengths",           3, &box_->box_size[0],   1
-      );
-  if (status < KIM_STATUS_OK) {
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    }
+  // Set constant length references to data for KIM.  We only know how
+  // long the variable length data is after calculating the ghost
+  // atoms.  But we can only do that after initializing the model,
+  // which outputs the cutoff.  So we have to make do with these for
+  // now.
+  model->setm_data(&status, 7*4,
+                   "numberOfParticles",   1, &box_->nall,                1,
+                   "numberParticleTypes", 1, &ntypes,                    1,
+                   "neighObject",         1, this,                       1,
+                   "boxSideLengths",      3, &box_->box_side_lengths[0], 1,
+                   "cutoff",              1, &cutoff,                    1,
+                   "energy",              1, &energy,                    1,
+                   "virial",              6, &virial(0),                 1
+                   );
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
 
-    // Pass methods to KIM.
-    status = model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
-    if (status < KIM_STATUS_OK) {
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    }
+  // Pass methods to KIM.
+  status = model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
 
-    // Init KIM model.
-    status = model->model_init();
-    if (status < KIM_STATUS_OK) {
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    }
+  // Init KIM model.
+  status = model->model_init();
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
 
+  // Now that we know the cutoff, we calculate neighbor lists and
+  // ghost atoms.  TODO: For now the skin is 0.
+  box_->update_neighbor_list(cutoff, 0.0);
 
-
+  // Allocate memory for variable length data and pass it to KIM.
+  const unsigned n = box_->nall;
+  forces.resize(3 * n);
+  particleEnergy.resize(n);
+  particleVirial.resize(6 * n);
+  model->setm_data(&status, 5*4, // TODO: use indices!
+                   "coordinates",    3*n, box_->get_positions_ptr(), 1,
+                   "particleTypes",    n, box_->get_types_ptr(),     1,
+                   "forces",         3*n, &forces[0],                1,
+                   "particleEnergy",   n, &particleEnergy[0],        1,
+                   "particleVirial", 6*n, &particleVirial[0],        1
+                   );
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
 }
 
+
+void Compute::compute() {
+  const int status = model->model_compute();
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
+
+  // Tricks to fix values when ghost atoms are in the game.
+  if (box_->nghosts)
+    switch (neighbor_mode) {
+    case KIM_cluster:
+      // Need to calculate whole box values from particle values due to
+      // the fact that ghost atoms were included in the summation.
+      energy = 0.0;
+      virial(0) = 0.0; virial(1) = 0.0; virial(2) = 0.0;
+      virial(3) = 0.0; virial(4) = 0.0; virial(5) = 0.0;
+      for (unsigned i = 0; i != box_->natoms; ++i) {
+        energy += particleEnergy[i];
+        virial(0) += particleVirial[i*6 + 0];
+        virial(1) += particleVirial[i*6 + 1];
+        virial(2) += particleVirial[i*6 + 2];
+        virial(3) += particleVirial[i*6 + 3];
+        virial(4) += particleVirial[i*6 + 4];
+        virial(5) += particleVirial[i*6 + 5];
+      }
+      break;
+    case KIM_mi_opbc_f:
+    case KIM_neigh_pure_f:
+    case KIM_neigh_rvec_f:
+      for (unsigned i = box_->natoms; i != box_->nall; ++i) {
+        const unsigned central = i % box_->natoms;
+        particleEnergy[central] += particleEnergy[i];
+        forces[3*central + 0] += forces[i*3 + 0];
+        forces[3*central + 1] += forces[i*3 + 1];
+        forces[3*central + 2] += forces[i*3 + 2];
+        particleVirial[6*central + 0] += particleVirial[i*6 + 0];
+        particleVirial[6*central + 1] += particleVirial[i*6 + 1];
+        particleVirial[6*central + 2] += particleVirial[i*6 + 2];
+        particleVirial[6*central + 3] += particleVirial[i*6 + 3];
+        particleVirial[6*central + 4] += particleVirial[i*6 + 4];
+        particleVirial[6*central + 5] += particleVirial[i*6 + 5];
+      }
+      break;
+    default:
+      throw runtime_error("unsupported neighbor mode.");
+  }
+
+  cout << "                                                                 "
+       << "               "
+       << forces[0] << " " << forces[1] << " " << forces[2]
+       << "  ::  "
+       << particleVirial[0] << " " << particleVirial[1] << " "
+       << particleVirial[2] << " " << particleVirial[3] << " "
+       << particleVirial[4] << " " << particleVirial[5] << " "
+       << "  ::  "
+       << particleEnergy[0]
+       << endl;
+}
+
+
+int Compute::get_neigh(KIM_API_model** kimmdl,
+                       const int *mode, const int* request,
+                       int *particle, int *numnei, int **nei1particle,
+                       double **rij) {
+  KIM_API_model& model = **kimmdl;
+  int status;
+  Compute& c = *( (Compute*)model.get_data("neighObject", &status) );
+  if (status < KIM_STATUS_OK)
+    return KIM_STATUS_FAIL;
+
+  // Get central atom.
+  int i;
+  if (*mode == 0) { // Iterator mode.
+    if (*request == 0) { // Reset requested.
+      c.kim_iter_pos = 0;
+      return KIM_STATUS_NEIGH_ITER_INIT_OK;
+    } else {             // Increment requested.
+      i = c.kim_iter_pos;
+      // Cancel if all non-ghost atoms exhausted.
+      if (i >= static_cast<int>(c.box_->natoms))
+        return KIM_STATUS_NEIGH_ITER_PAST_END;
+      ++c.kim_iter_pos;
+    }
+  } else {          // Locator mode.
+    i = *request;
+  }
+
+  // Prepare return values.
+  if (i < static_cast<int>(c.box_->natoms)) {
+    // Not a ghost atom.
+    const vector<int>& neighbors = c.box_->get_neighbors(i);
+    *particle = i;
+    *numnei = neighbors.size();
+    // We can get away with the const casts because (at least by
+    // convention) KIM guarantees that the model will not fiddle with
+    // these arrays.
+    *nei1particle = const_cast<int*>(&neighbors[0]);
+    *rij = c.kim_wants_rvec
+      ? const_cast<double*>(c.box_->get_neighbor_rvecs_ptr(i))
+      : nullptr;
+  } else {
+    // Ghost atom.
+    *particle = i;
+    *numnei = 0;
+    *nei1particle = nullptr;
+    *rij = nullptr;
+  }
+
+  return KIM_STATUS_OK;
+}
 
 
 
@@ -497,9 +621,9 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname,
 
 int main() {
   vector<int> types;
-  types.push_back(1);
-  //types.push_back(1);
-  Box b("fcc", 3.940, true, 10, 10, 10, false, false, false,
+  types.push_back(0);
+  //types.push_back(0);
+  Box b("sc", 2.525, true, 2, 2, 2, true, true, true,
         types, true, "box");
 
   b.update_neighbor_list(2.92, 0.0);
@@ -516,7 +640,61 @@ int main() {
   }
   cout << endl;
 
-  b.write_to("dump");
+  // b.write_to("dump");
+
+  //////////////////////////////////////////////////////////////////////
+
+  {
+    Compute comp(make_unique<Box>("sc", 2.525, true, 2, 2, 2,
+                                  true, true, true,
+                                  types, true, "box"),
+                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000",
+                 KIM_cluster);
+    comp.compute();
+    cout << comp.get_energy_per_atom() << " eV/atom";
+    for (unsigned i = 0; i != 6; ++i)
+      printf("  %8.4g", comp.get_virial()(i));
+    cout << endl;
+  }
+
+  {
+    Compute comp(make_unique<Box>("sc", 2.525, true, 2, 2, 2,
+                                  true, true, true,
+                                  types, true, "box"),
+                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000",
+                 KIM_mi_opbc_f);
+    comp.compute();
+    cout << comp.get_energy_per_atom() << " eV/atom";
+    for (unsigned i = 0; i != 6; ++i)
+      printf("  %8.4g", comp.get_virial()(i));
+    cout << endl;
+  }
+
+  {
+    Compute comp(make_unique<Box>("sc", 2.525, true, 2, 2, 2,
+                                  true, true, true,
+                                  types, true, "box"),
+                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000",
+                 KIM_neigh_pure_f);
+    comp.compute();
+    cout << comp.get_energy_per_atom() << " eV/atom";
+    for (unsigned i = 0; i != 6; ++i)
+      printf("  %8.4g", comp.get_virial()(i));
+    cout << endl;
+  }
+
+  {
+    Compute comp(make_unique<Box>("sc", 2.525, true, 2, 2, 2,
+                                  true, true, true,
+                                  types, true, "box"),
+                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000",
+                 KIM_neigh_rvec_f);
+    comp.compute();
+    cout << comp.get_energy_per_atom() << " eV/atom";
+    for (unsigned i = 0; i != 6; ++i)
+      printf("  %8.4g", comp.get_virial()(i));
+    cout << endl;
+  }
 
   return 0;
 }

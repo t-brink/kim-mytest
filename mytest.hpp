@@ -26,6 +26,7 @@
 
 #include <fstream>
 #include <vector>
+#include <array>
 #include <string>
 #include <map>
 #include <memory>
@@ -174,9 +175,6 @@ namespace mytest {
 
         @todo Actually make sure the internal storage of Vec3D is
         continuous!!  Use array internally, make x/y/z references!
-
-        @todo Do I really want to return a reference? KIM needs one
-        but perhaps another solution is better?
      */
     const Vec3D<double>& a;
 
@@ -187,9 +185,6 @@ namespace mytest {
 
         @todo Actually make sure the internal storage of Vec3D is
         continuous!!  Use array internally, make x/y/z references!
-
-        @todo Do I really want to return a reference? KIM needs one
-        but perhaps another solution is better?
      */
     const Vec3D<double>& b;
 
@@ -200,9 +195,6 @@ namespace mytest {
 
         @todo Actually make sure the internal storage of Vec3D is
         continuous!!  Use array internally, make x/y/z references!
-
-        @todo Do I really want to return a reference? KIM needs one
-        but perhaps another solution is better?
      */
     const Vec3D<double>& c;
 
@@ -305,7 +297,36 @@ namespace mytest {
         @return A pointer to a 2D array with distance vectors. In
                 the same order as the output of get_neighbors().
     */
-    const double* get_neighbor_rvecs_ptr(unsigned i) const;
+    const double* get_neighbor_rvecs_ptr(unsigned i) const {
+      return &neigh_rvec_[i][0];
+    };
+
+    /** Return const pointer to position (including ghosts).
+
+        This is different from the @c positions field insofar as this
+        the data that must be used for actual calculations. It is
+        updated by update_neighbor_list() and update_ghosts().  The
+        returned pointer may lose validity when calling
+        update_neighbor_list().  It is also the position data that
+        includes ghost atom positions.
+
+        In short: If you want to change positions use the @c positions
+        field, if you want to calculate based on positions use this
+        method.
+    */
+    const double* get_positions_ptr() const {
+      return &(*ghost_positions)(0,0);
+    }
+
+    /** Return const pointer to types (including ghosts).
+
+        Same arguments as for get_positions() vs @c positions apply.
+
+        @see get_positions()
+    */
+    const int* get_types_ptr() const {
+      return &(*ghost_types)(0);
+    }
 
     // IO //////////////////////////////////////////////////////////////
 
@@ -435,21 +456,59 @@ namespace mytest {
     void compute();
 
     /** Get the computed potential energy of the box. */
-    double get_energy() const;
+    double get_energy() const {
+      return energy;
+    };
 
     /** Get the computed potential energy per atom of the box. */
-    double get_energy_per_atom() const;
+    double get_energy_per_atom() const {
+      return energy / box_->natoms;
+    };
+
+    /** Get the computed virial tensor. */
+    Voigt6<double> get_virial() const {
+      return virial;
+    }
 
   private:
     std::unique_ptr<Box> box_;
     KIM_API_model* model;
-    // Model constants.
+    KIMNeigh neighbor_mode;
+    // Model input.
     int ntypes;
+    // Model output (constant).
     std::map<const std::string,int> partcl_type_codes;
     double cutoff;
-    // Computation results.
+    // Computation results, fixed length.
     double energy;
-    std::unique_ptr< Array2D<double> > forces;
+    Voigt6<double> virial;
+    // Computation results, length as function of number of atoms +
+    // ghost atoms.
+    std::vector<double> forces;
+    std::vector<double> particleEnergy;
+    std::vector<double> particleVirial;
+    // Store current index of KIM iteration. This (at least) makes
+    // this class not thread safe!
+    unsigned kim_iter_pos;
+    bool kim_wants_rvec;
+
+    /** Get neighbor list function for KIM.
+
+        @param[in] kimmdl The KIM model.
+        @param[in] mode Iterator or locator mode.
+        @param[in] request The requested index or reset/increment for
+                           iterator mode.
+        @param[out] particle The actual central atom index.
+        @param[out] numnei The number of neighbors.
+        @param[out] nei1particle Array of neighbor indices.
+        @param[out] rij Array of neighbor distance vectors.
+
+        @return Status.
+     */
+    static int get_neigh(KIM_API_model** kimmdl,
+                         const int* mode, const int* request,
+                         int* particle, int* numnei, int** nei1particle,
+                         double** rij);
   };
 
 }
