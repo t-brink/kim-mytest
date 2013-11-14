@@ -464,6 +464,33 @@ namespace mytest {
   };
 
 
+  /** Interface to KIM model free parameters. */
+  class FreeParam {
+  public:
+    FreeParam(const std::string& name,
+              const std::vector<unsigned>& shape,
+              int kim_index)
+      : name(name), rank(shape.size()), size(mult_(shape)), shape(shape),
+        kim_index(kim_index)
+    {}
+
+    const std::string name;
+    const unsigned rank;
+    const unsigned size;
+    const std::vector<unsigned> shape;
+    const int kim_index;
+
+  private:
+    /** Helper to get the product of all vector entries. */
+    static unsigned mult_(const std::vector<unsigned>& shape) {
+      unsigned product = 1;
+      for (unsigned factor : shape)
+        product *= factor;
+      return product;
+    }
+  };
+
+
   /** Main interface class.
 
       This class contains a simulation box and interacts with KIM.
@@ -485,6 +512,14 @@ namespace mytest {
         Will deallocate all KIM memory, too.
     */
     ~Compute();
+
+    /** Update the neighbor list and re-register any changed arrays to
+        KIM.
+
+        Call after atom positions have changed more than the cutoff
+        skin or if the cutoff has changed (increased).
+    */
+    void update_neighbor_list();
 
     /** Get box vector a. */
     Vec3D<double> get_a() const { return box_->a; }
@@ -654,6 +689,48 @@ namespace mytest {
       return virial;
     }
 
+    /** Change model parameter.
+
+        @param param_name KIM name of the free parameter.
+        @param indices Indices indicating which element of the
+                       parameter array to access (must have zero
+                       length for parameters that are scalars).
+        @param value The new value (must match the type of the
+                     parameter).
+        @param reinit The new parameter may not actually be used or
+                      used correctly until this method was called with
+                      reinit = true. Setting it to false can be used
+                      when updating several parameters in a row to
+                      save computation time. Optional, default is @c true.
+
+        @todo There is no way to know the *type* of the free parameter 
+        using the KIM API.  We don't check for now.                    
+    */
+    void set_parameter(const std::string& param_name,
+                       const std::vector<unsigned>& indices,
+                       double value, bool reinit = true);
+
+    /** Change model parameter.
+
+        @param param_name KIM name of the free parameter.
+        @param indices Indices indicating which element of the
+                       parameter array to access (must have zero
+                       length for parameters that are scalars).
+        @param value The new value (must match the type of the
+                     parameter).
+        @param reinit The new parameter may not actually be used or
+                      used correctly until this method was called with
+                      reinit = true. Setting it to false can be used
+                      when updating several parameters in a row to
+                      save computation time. Optional, default is @c true.
+
+        @todo There is no way to know the *type* of the free parameter 
+        using the KIM API.  We don't check for now.                    
+    */
+    void set_parameter(const std::string& param_name,
+                       const std::vector<unsigned>& indices,
+                       int value, bool reinit = true);
+
     /** Optimize box vector lengths to minimize energy.
 
         Does not update neighbor lists.
@@ -695,6 +772,8 @@ namespace mytest {
     std::map<std::string,int> partcl_type_codes;
     std::map<int,std::string> partcl_type_names;
     double cutoff;
+    std::vector<FreeParam> free_parameters; // TODO: accessors   
+    std::map<std::string,FreeParam> free_parameter_map;
     // Computation results, fixed length.
     double energy;
     Voigt6<double> virial;
@@ -729,14 +808,6 @@ namespace mytest {
                          int* particle, int* numnei, int** nei1particle,
                          double** rij);
 
-    /** Update the neighbor list and re-register any changed arrays to
-        KIM.
-
-        Call after atom positions have changed more than the cutoff
-        skin or if the cutoff has changed (increased).
-    */
-    void update_neighbor_list();
-
     /** Objective function for optimizing the box.
 
         This optimizes the length of the box vectors.
@@ -749,6 +820,12 @@ namespace mytest {
     static double obj_func_pos(const std::vector<double>& x,
                                std::vector<double>& grad,
                                void* f_data);
+
+    /** set_parameter() implementation. */
+    template<typename T>
+    void set_parameter_impl(const std::string& param_name,
+                            const std::vector<unsigned>& indices,
+                            T value, bool reinit);
   };
 
 }

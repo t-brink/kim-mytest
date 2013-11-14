@@ -713,7 +713,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                         + string(" of file ") + string(__FILE__));
 
   // Check if the atom types in the box are supported by the model.
-  for (unsigned i = 0; i != box_->types.extent(0); ++i)
+  for (int i = 0; i != box_->types.extent(0); ++i)
     if (partcl_type_names.find(box_->types(i)) == partcl_type_names.end())
       // Unknown particle code.
       throw runtime_error("Unknown particle code: "+to_string(box_->types(i)));
@@ -754,6 +754,42 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
+
+  // Store free parameter names of the model.
+  int n_params;
+  const char* param_names = model->get_free_params(&n_params, &status);
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
+  for (int i = 0; i != n_params; ++i) {
+    const string param_name = &param_names[i*KIM_KEY_STRING_LENGTH];
+    const int param_index = model->get_index(param_name.c_str(), &status);
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+    vector<int> param_shape_(100); // TODO: KIM has no way to get the    
+                                   // rank of the parameter, so we       
+                                   // have to hope (quite reasonably)    
+                                   // that it will never be bigger       
+                                   // than 100.                          
+    const int param_rank = model->get_shape_by_index(param_index,
+                                                     &param_shape_[0],
+                                                     &status);
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+    vector<unsigned> param_shape;
+    for (int j = 0; j != param_rank; ++j)
+      param_shape.push_back(param_shape_[j]);
+    FreeParam fp(param_name, param_shape, param_index);
+    free_parameters.push_back(fp);
+    // Fancy way to do free_parameter_map[param_name] = fp; but
+    // without assignment or copy.
+    free_parameter_map.emplace(piecewise_construct,
+                               forward_as_tuple(param_name),
+                               forward_as_tuple(param_name, param_shape,
+                                                param_index));
+  }
 
   // Now that we know the cutoff, we calculate neighbor lists and
   // ghost atoms.  Then we allocate memory for variable length data
@@ -911,6 +947,59 @@ void Compute::update_neighbor_list() {
   }
 }
 
+template<typename T>
+void Compute::set_parameter_impl(const string& param_name,
+                                 const vector<unsigned>& indices,
+                                 T value, bool reinit) {
+  // Get parameter data.
+  const auto it = free_parameter_map.find(param_name);
+  if (it == free_parameter_map.end())
+    throw runtime_error("Unknown free parameter: " + param_name);
+  const FreeParam& param = it->second;
+  // Check rank.
+  if (indices.size() != param.rank)
+    throw runtime_error("Rank of indices ("
+                        + to_string(indices.size())
+                        + ") doesn't match rank of parameter ("
+                        + to_string(param.rank) + ")");
+  // Set it.
+  int status;
+  T* p = (T*)model->get_data_by_index(param.kim_index, &status);
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
+  unsigned index = 0;
+  for (unsigned k = 0; k != param.rank; ++k) {
+    unsigned product = 1;
+    for (unsigned l = k + 1; l != param.rank; ++l)
+      product *= param.shape[l];
+    index += product * indices[k];
+  }
+  p[index] = value;
+
+  // Reinit model.
+  if (reinit) {
+    status = model->model_reinit();
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+  }
+}
+
+void Compute::set_parameter(const string& param_name,
+                            const vector<unsigned>& indices,
+                            double value, bool reinit) {
+  // TODO: check if this uses the correct type.     
+  set_parameter_impl<double>(param_name, indices, value, reinit);
+}
+
+void Compute::set_parameter(const string& param_name,
+                            const vector<unsigned>& indices,
+                            int value, bool reinit) {
+  // TODO: check if this uses the correct type.     
+  set_parameter_impl<int>(param_name, indices, value, reinit);
+}
+
 
 // Fitting /////////////////////////
 
@@ -1018,12 +1107,15 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
     throw runtime_error("unknown neighbor mode.");
   }
   // Init.
-  vector<int> types;
-  types.push_back(0);
-  Compute comp(make_unique<Box>(lat, lat_const*1.1, true, 3, 3, 3,
+  const vector<int> types{ 0 };
+  Compute comp(make_unique<Box>(lat, lat_const*0.9, true, 3, 3, 3,
                                 true, true, true,
                                 types, neighmode, "box"),
                "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
+
+  comp.set_parameter("PARAM_FREE_Rc", vector<unsigned>{ 0, 0, 0 }, 2.9, false);
+  comp.set_parameter("PARAM_FREE_Dc", vector<unsigned>{ 0, 0, 0 }, 0.15);
+  comp.update_neighbor_list();
   /*
   comp.compute();
   cout << comp.get_energy_per_atom() << " eV/atom";
@@ -1110,8 +1202,8 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
 
 
 int main() {
-  const char lat[] = "diamond";
-  const double lat_const = 5.429;
+  const char lat[] = "fcc";
+  const double lat_const = 3.940;
   vector<int> types;
   types.push_back(0);
   //types.push_back(0);
