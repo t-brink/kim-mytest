@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <utility>
 #include <cmath>
+#include <chrono>
 
 #include <KIM_API_C.h>
 #include <KIM_API_status.h>
@@ -496,6 +497,54 @@ void Box::write_to(ostream& output) const {
 }
 
 
+void Box::deform(Voigt6<double> defmatrix) {
+  // Check MI_OPBC_F constraints.
+  if (kim_neighbor_mode == KIM_mi_opbc_f
+      && (abs(defmatrix(3)) > DELTA
+          || abs(defmatrix(4)) > DELTA
+          || abs(defmatrix(5)) > DELTA))
+    throw runtime_error("cannot shear box with MI_OPBC_F neighbor list.");
+
+  // Throw away very small shear.
+  if (abs(defmatrix(3)) < DELTA)
+    defmatrix(3) = 0.0;
+  if (abs(defmatrix(4)) < DELTA)
+    defmatrix(4) = 0.0;
+  if (abs(defmatrix(5)) < DELTA)
+    defmatrix(5) = 0.0;
+
+  // Update box.
+  Vec3D<double> new_a(0.0, 0.0, 0.0);
+  Vec3D<double> new_b(0.0, 0.0, 0.0);
+  Vec3D<double> new_c(0.0, 0.0, 0.0);
+  for (unsigned i = 0; i != 3; ++i)
+    for (unsigned j = 0; j != 3; ++j) {
+      new_a[i] += defmatrix(i,j)*a_[j];
+      new_b[i] += defmatrix(i,j)*b_[j];
+      new_c[i] += defmatrix(i,j)*c_[j];
+    }
+  a_ = new_a; b_ = new_b; c_ = new_c;
+  box_side_lengths_[0] = a_.abs();
+  box_side_lengths_[1] = b_.abs();
+  box_side_lengths_[2] = c_.abs();
+
+  // Update positions.
+  for (unsigned atom = 0; atom != natoms_; ++atom) {
+    Vec3D<double> pos(0.0, 0.0, 0.0);
+    for (unsigned i = 0; i != 3; ++i)
+      for (unsigned j = 0; j != 3; ++j) {
+        pos[i] += defmatrix(i,j)*positions(atom,j);
+      }
+    // Assign back.
+    for (unsigned dim = 0; dim != 3; ++dim)
+      positions(atom,dim) = pos[dim];
+  }
+
+  // Update ghosts etc.
+  update_ghost_rvecs();
+}
+
+
 
 unsigned Box::atoms_per_unit_cell(const string& lattice, bool cubic) {
 
@@ -858,11 +907,10 @@ void Compute::update_neighbor_list() {
 
 // Fitting /////////////////////////
 
-/*
-double Compute::obj_func_box(unsigned n, const double* x, double* grad,
-                                    void* f_data) {
+double Compute::obj_func_box(const vector<double>& x, vector<double>& grad,
+                             void* f_data) {
   Compute& c = *(static_cast<Compute*>(f_data));
-  if (n != 3)
+  if (x.size() != 3)
     throw runtime_error("This objective function only works with "
                         "3 parameters.");
   // Scale box, we assume the neighbor list doesn't change (TODO?).
@@ -870,7 +918,7 @@ double Compute::obj_func_box(unsigned n, const double* x, double* grad,
   c.compute();
   ++c.fit_counter;
   // Gradient.
-  if (grad)
+  if (!grad.empty())
     throw runtime_error("Gradient not supported for box optimization.");
   // Objective function value is energy.
   return c.energy;
@@ -897,7 +945,7 @@ double Compute::optimize_box(double ftol_abs, unsigned maxeval) {
   optimizer.optimize(lengths, obj_val);
   return obj_val;
 }
-*/
+
 
 double Compute::obj_func_pos(const vector<double>& x, vector<double>& grad,
                              void* f_data) {
@@ -965,7 +1013,7 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
   // Init.
   vector<int> types;
   types.push_back(0);
-  Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
+  Compute comp(make_unique<Box>(lat, lat_const*1.1, true, 3, 3, 3,
                                 true, true, true,
                                 types, neighmode, "box"),
                "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
@@ -977,18 +1025,76 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
   cout << endl;
   */
 
+  chrono::steady_clock::time_point start;
+  chrono::steady_clock::time_point stop;
+  chrono::duration<double> delta;
+
   comp.move_atom(0, 0.2, 0.0, 0.0);
+
+  printf("== Box scaling ================ %12s ============\n",
+         neighmode_str.c_str());
   comp.compute();
   cout << "\nBefore optimization: "
-       << comp.get_energy_per_atom()
-       << " eV/atom        " << neighmode_str << endl;
+       << comp.get_energy_per_atom() << " eV/atom" << endl;
   try {
-    comp.optimize_positions(0.001, 10000);
+    start = chrono::steady_clock::now();
+    comp.optimize_box(0.001, 10000);
+    stop = chrono::steady_clock::now();
+    delta = chrono::duration_cast<chrono::duration<double>>(stop - start);
     cout << "After " << comp.get_optimization_steps() << " steps: "
-         << comp.get_energy_per_atom() << " eV/atom" << endl;
+         << comp.get_energy_per_atom() << " eV/atom"
+         << "                       took " << delta.count() << " s."
+         << endl;
+    cout << "a = " << comp.box_->box_side_lengths[0]/3 << "  "
+         << "b = " << comp.box_->box_side_lengths[1]/3 << "  "
+         << "c = " << comp.box_->box_side_lengths[2]/3 << "  "
+         << "goal = " << lat_const << endl;
   } catch (const exception& e) {
     cout << "NLopt failed :-(" << endl;
   }
+  cout << endl;
+
+  printf("== Position scaling =========== %12s ============\n",
+         neighmode_str.c_str());
+  comp.compute();
+  cout << "\nBefore optimization: "
+       << comp.get_energy_per_atom() << " eV/atom" << endl;
+  try {
+    start = chrono::steady_clock::now();
+    comp.optimize_positions(0.001, 10000);
+    stop = chrono::steady_clock::now();
+    delta = chrono::duration_cast<chrono::duration<double>>(stop - start);
+    cout << "After " << comp.get_optimization_steps() << " steps: "
+         << comp.get_energy_per_atom() << " eV/atom"
+         << "                       took " << delta.count() << " s."
+         << endl;
+  } catch (const exception& e) {
+    cout << "NLopt failed :-(" << endl;
+  }
+  cout << endl;
+
+  printf("== Box scaling II ============= %12s ============\n",
+         neighmode_str.c_str());
+  comp.compute();
+  cout << "\nBefore optimization: "
+       << comp.get_energy_per_atom() << " eV/atom" << endl;
+  try {
+    start = chrono::steady_clock::now();
+    comp.optimize_box(0.001, 10000);
+    stop = chrono::steady_clock::now();
+    delta = chrono::duration_cast<chrono::duration<double>>(stop - start);
+    cout << "After " << comp.get_optimization_steps() << " steps: "
+         << comp.get_energy_per_atom() << " eV/atom"
+         << "                       took " << delta.count() << " s."
+         << endl;
+    cout << "a = " << comp.box_->box_side_lengths[0]/3 << "  "
+         << "b = " << comp.box_->box_side_lengths[1]/3 << "  "
+         << "c = " << comp.box_->box_side_lengths[2]/3 << "  "
+         << "goal = " << lat_const << endl;
+  } catch (const exception& e) {
+    cout << "NLopt failed :-(" << endl;
+  }
+  cout << endl;
 }
 
 
@@ -1013,34 +1119,15 @@ int main() {
   for (const auto& j : b.get_neighbors(i)) {
     printf("  %6.3f", b.calc_dist(i,j));
   }
-  cout << endl;
+  cout << endl << endl;
 
   // b.write_to("dump");
 
   //////////////////////////////////////////////////////////////////////
   do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
   do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_rvec_f);
+  return 0;
   do_something(lat, lat_const, KIM_cluster);
   do_something(lat, lat_const, KIM_mi_opbc_f);
   do_something(lat, lat_const, KIM_neigh_pure_f);

@@ -380,7 +380,9 @@ namespace mytest {
         @param factor_b Multiply box vector b by this factor.
         @param factor_c Multiply box vector c by this factor.
     */
-    void scale(double factor_a, double factor_b, double vector_c);
+    void scale(double factor_a, double factor_b, double factor_c) {
+      deform(Voigt6<double>(factor_a, factor_b, factor_c, 0, 0, 0));
+    }
 
     /** Set box vector lengths.
 
@@ -391,7 +393,12 @@ namespace mytest {
         @param len_b Scale box vector b to have this length.
         @param len_c Scale box vector c to have this length.
     */
-    void scale_to(double len_a, double len_b, double len_c);
+    void scale_to(double len_a, double len_b, double len_c) {
+      scale(len_a / box_side_lengths_[0],
+            len_b / box_side_lengths_[1],
+            len_c / box_side_lengths_[2]);
+    }
+
 
     /** Deform box by given deformation matrix.
 
@@ -406,7 +413,7 @@ namespace mytest {
         @todo Take care that the box stays orthorhombic if
               kim_neighbor_mode is KIM_mi_opbc_f.
     */
-    void deform(const Voigt6<double>& defmatrix);
+    void deform(Voigt6<double> defmatrix);
 
     /** Deform box to fit the given box vectors.
 
@@ -644,6 +651,7 @@ namespace mytest {
     }
 
   private:
+  public:    
     std::unique_ptr<Box> box_;
     KIM_API_model* model;
     KIMNeigh neighbor_mode;
@@ -698,7 +706,8 @@ namespace mytest {
 
         This optimizes the length of the box vectors.
     */
-    static double obj_func_box(unsigned n, const double* x, double* grad,
+    static double obj_func_box(const std::vector<double>& x,
+                               std::vector<double>& grad,
                                void* f_data);
 
     /** Objective function for optimizing the atom positions. */
