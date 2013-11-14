@@ -701,6 +701,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
     partcl_type_codes[t] = code;
+    partcl_type_names[code] = t;
     // Add to descriptor.
     descriptor += t + " spec " + to_string(code) + "\n";
   }
@@ -710,6 +711,12 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
+
+  // Check if the atom types in the box are supported by the model.
+  for (unsigned i = 0; i != box_->types.extent(0); ++i)
+    if (partcl_type_names.find(box_->types(i)) == partcl_type_names.end())
+      // Unknown particle code.
+      throw runtime_error("Unknown particle code: "+to_string(box_->types(i)));
 
   // Init KIM.
   status = KIM_API_string_init(&model, descriptor.c_str(),
@@ -1031,6 +1038,10 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
 
   comp.move_atom(0, 0.2, 0.0, 0.0);
 
+  /*
+  cout << comp.get_particle_type_code("Si") << " : "
+       << comp.get_particle_type_name(0) << endl;
+  */
   printf("== Box scaling ================ %12s ============\n",
          neighmode_str.c_str());
   comp.compute();
@@ -1045,9 +1056,9 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
          << comp.get_energy_per_atom() << " eV/atom"
          << "                       took " << delta.count() << " s."
          << endl;
-    cout << "a = " << comp.box_->box_side_lengths[0]/3 << "  "
-         << "b = " << comp.box_->box_side_lengths[1]/3 << "  "
-         << "c = " << comp.box_->box_side_lengths[2]/3 << "  "
+    cout << "a = " << comp.get_a().abs()/3 << "  "
+         << "b = " << comp.get_b().abs()/3 << "  "
+         << "c = " << comp.get_c().abs()/3 << "  "
          << "goal = " << lat_const << endl;
   } catch (const exception& e) {
     cout << "NLopt failed :-(" << endl;
@@ -1087,9 +1098,9 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
          << comp.get_energy_per_atom() << " eV/atom"
          << "                       took " << delta.count() << " s."
          << endl;
-    cout << "a = " << comp.box_->box_side_lengths[0]/3 << "  "
-         << "b = " << comp.box_->box_side_lengths[1]/3 << "  "
-         << "c = " << comp.box_->box_side_lengths[2]/3 << "  "
+    cout << "a = " << comp.get_a().abs()/3 << "  "
+         << "b = " << comp.get_b().abs()/3 << "  "
+         << "c = " << comp.get_c().abs()/3 << "  "
          << "goal = " << lat_const << endl;
   } catch (const exception& e) {
     cout << "NLopt failed :-(" << endl;

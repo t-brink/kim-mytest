@@ -486,22 +486,39 @@ namespace mytest {
     */
     ~Compute();
 
-    /** Compute values using KIM. */
-    void compute();
+    /** Get box vector a. */
+    Vec3D<double> get_a() const { return box_->a; }
 
-    /** Get the computed potential energy of the box. */
-    double get_energy() const {
-      return energy;
-    };
+    /** Get box vector b. */
+    Vec3D<double> get_b() const { return box_->b; }
 
-    /** Get the computed potential energy per atom of the box. */
-    double get_energy_per_atom() const {
-      return energy / box_->natoms;
-    };
+    /** Get box vector c. */
+    Vec3D<double> get_c() const { return box_->c; }
 
-    /** Get the computed virial tensor. */
-    Voigt6<double> get_virial() const {
-      return virial;
+    /** Get code for a particle type.
+
+        @param name String representation (chemical symbol).
+        @return Type code.
+    */
+    int get_particle_type_code(const std::string& name) {
+      auto it = partcl_type_codes.find(name);
+      if (it != partcl_type_codes.end())
+        return it->second;
+      else
+        throw std::runtime_error("unknown type code");
+    }
+
+    /** Get name for a particle type.
+
+        @param code Integer represting that particle type.
+        @return Type name.
+    */
+    std::string get_particle_type_name(int code) {
+      auto it = partcl_type_names.find(code);
+      if (it != partcl_type_names.end())
+        return it->second;
+      else
+        throw std::runtime_error("unknown type name");
     }
 
     /** Get position of an atom.
@@ -619,6 +636,24 @@ namespace mytest {
         box_->update_ghost_rvecs();
     }
 
+    /** Compute values using KIM. */
+    void compute();
+
+    /** Get the computed potential energy of the box. */
+    double get_energy() const {
+      return energy;
+    };
+
+    /** Get the computed potential energy per atom of the box. */
+    double get_energy_per_atom() const {
+      return energy / box_->natoms;
+    };
+
+    /** Get the computed virial tensor. */
+    Voigt6<double> get_virial() const {
+      return virial;
+    }
+
     /** Optimize box vector lengths to minimize energy.
 
         Does not update neighbor lists.
@@ -651,14 +686,14 @@ namespace mytest {
     }
 
   private:
-  public:    
     std::unique_ptr<Box> box_;
     KIM_API_model* model;
     KIMNeigh neighbor_mode;
     // Model input.
     int ntypes;
     // Model output (constant).
-    std::map<const std::string,int> partcl_type_codes;
+    std::map<std::string,int> partcl_type_codes;
+    std::map<int,std::string> partcl_type_names;
     double cutoff;
     // Computation results, fixed length.
     double energy;
