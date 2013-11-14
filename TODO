@@ -1,22 +1,14 @@
-* Neighborlists using ghost atoms are somewhat implemented
-** still support MI_OPBC_F *if* box is orthorhombic
-*** Should use ghostless neighbor lists
-** disable neighbor lists when using cluster
-** correctly feed the ghost atoms to KIM, this is still somewhat
-   segfault-heavy :-(
-*** the LAMMPS plugin passes number of atoms + number of ghosts as
-   numberOfParticles, when only providing iterator access to neighbors
-   this may be acceptable
-** take care to update ghost atoms and neighborlists at appropriate
-   times
-** neighbor lists need "skin"
+* To reach feature-parity with the old code, implement a way to change
+  parameters (e.g. cutoff).
 
-* organize everything in a readable and maintainable way
-** well-defined interfaces need to be implemented
+* Neighborlists using ghost atoms are somewhat implemented
+** neighbor lists need "skin" [This is possible already but Compute
+   just sets a zero skin. This must be user-definable because the
+   optimal skin dpends on what should be done with the
+   box. E.g. lattice MC doesn't need skin at all.]
 
 * Way to optimize box volume and shape in addition to positions
-
-* Non-orthorhombic boxes
+** Simple scaling of abs(a), abs(b) and abs(c) is already possible.
 
 * bulk modulus curves with relaxation
 * elastic constants (stiffness tensor)
@@ -32,14 +24,6 @@
 
 * make it possible to do this all with different neighbor list methods
 
-* clean up class interfaces
-** if we can get a non-const reference anyway, we don't need a method
-   to get it, just make it public
-
 * Monte-Carlo
-
-* Array1D to match Array2D, Array3D, ...
-
-* Dynamic choice of model
 
 * ...
