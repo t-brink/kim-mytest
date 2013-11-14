@@ -25,7 +25,7 @@ include ../Makefile.KIM_Config
 # set test specific details
 TEST_NAME := mytest
 
-LOCALOBJ =
+LOCALOBJ = mytestcore.o mytest.o
 
 LOCALCLEAN =
 

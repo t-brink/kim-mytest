@@ -1,5 +1,5 @@
-#include <iostream>
-#include <cstdio>
+//#include <iostream>
+//#include <cstdio>
 #include <utility>
 #include <cmath>
 #include <chrono>
@@ -8,7 +8,7 @@
 #include <KIM_API_status.h>
 #include <nlopt.hpp>
 
-#include "mytest.hpp"
+#include "mytestcore.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -1201,6 +1201,7 @@ void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
 }
 
 
+/*
 int main() {
   const char lat[] = "fcc";
   const double lat_const = 3.940;
@@ -1238,3 +1239,4 @@ int main() {
 
   return 0;
 }
+*/

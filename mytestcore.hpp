@@ -21,8 +21,8 @@
   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef MYTEST_HPP
-#define MYTEST_HPP
+#ifndef MYTESTCORE_HPP
+#define MYTESTCORE_HPP
 
 #include <fstream>
 #include <vector>
@@ -830,4 +830,4 @@ namespace mytest {
 
 }
 
-#endif /* MYTEST_HPP */
+#endif /* MYTESTCORE_HPP */

@@ -1,5 +1,4 @@
-* To reach feature-parity with the old code, implement a way to change
-  parameters (e.g. cutoff).
+* A simple scripting language to drive the program.
 
 * Neighborlists using ghost atoms are somewhat implemented
 ** neighbor lists need "skin" [This is possible already but Compute
