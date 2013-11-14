@@ -134,7 +134,36 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
       atoms.push_back(t_atom(Vec3D<double>(0.0, 0.0, 0.0), types_in[0]));
     }
   } else if (lattice == "diamond") {
-    throw runtime_error("not implemented.");
+    if (cubic) {
+      unit_a = Vec3D<double>(lattice_const, 0.0, 0.0);
+      unit_b = Vec3D<double>(0.0, lattice_const, 0.0);
+      unit_c = Vec3D<double>(0.0, 0.0, lattice_const);
+      atoms.push_back(t_atom(Vec3D<double>(0.00, 0.00, 0.00) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.25, 0.25, 0.25) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.00, 0.50, 0.50) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.25, 0.75, 0.75) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.50, 0.00, 0.50) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.75, 0.25, 0.75) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.50, 0.50, 0.00) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.75, 0.75, 0.25) * lattice_const,
+                             types_in[0]));
+
+    } else {
+      unit_a = Vec3D<double>(0.0, 0.5, 0.5) * lattice_const;
+      unit_b = Vec3D<double>(0.5, 0.0, 0.5) * lattice_const;
+      unit_c = Vec3D<double>(0.5, 0.5, 0.0) * lattice_const;
+      atoms.push_back(t_atom(Vec3D<double>(0.00, 0.00, 0.00) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.25, 0.25, 0.25) * lattice_const,
+                             types_in[0]));
+    }
   } else if (lattice == "B1") {
     throw runtime_error("not implemented.");
   } else if (lattice == "B2") {
@@ -892,11 +921,13 @@ double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
 
 
 int main() {
+  const char lat[] = "diamond";
+  const double lat_const = 5.429;
   vector<int> types;
   types.push_back(0);
   //types.push_back(0);
-  Box b("sc", 2.525, true, 3, 3, 3, true, true, true,
-        types, KIM_mi_opbc_f, "box");
+  Box b(lat, lat_const, false, 2, 2, 2, true, true, true,
+        types, KIM_neigh_pure_f, "box");
 
   b.update_neighbor_list(2.92, 0.0);
 
@@ -915,9 +946,8 @@ int main() {
   // b.write_to("dump");
 
   //////////////////////////////////////////////////////////////////////
-
   {
-    Compute comp(make_unique<Box>("sc", 2.525, true, 3, 3, 3,
+    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
                                   true, true, true,
                                   types, KIM_cluster, "box"),
                  "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
@@ -938,7 +968,7 @@ int main() {
   }
 
   {
-    Compute comp(make_unique<Box>("sc", 2.525, true, 3, 3, 3,
+    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
                                   true, true, true,
                                   types, KIM_mi_opbc_f, "box"),
                  "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
@@ -959,7 +989,7 @@ int main() {
   }
 
   {
-    Compute comp(make_unique<Box>("sc", 2.525, true, 3, 3, 3,
+    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
                                   true, true, true,
                                   types, KIM_neigh_pure_f, "box"),
                  "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
@@ -969,16 +999,18 @@ int main() {
       printf("  %8.4g", comp.get_virial()(i));
     cout << endl;
 
+    /*
     comp.box_->positions(0,0) += 0.2;
     comp.box_->update_ghost_rvecs();
     comp.compute();
     cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
     comp.optimize_positions(0.0001, 10000);
     cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    */
   }
 
   {
-    Compute comp(make_unique<Box>("sc", 2.525, true, 3, 3, 3,
+    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
                                   true, true, true,
                                   types, KIM_neigh_rvec_f, "box"),
                  "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
@@ -988,12 +1020,14 @@ int main() {
       printf("  %8.4g", comp.get_virial()(i));
     cout << endl;
 
+    /*
     comp.box_->positions(0,0) += 0.2;
     comp.box_->update_ghost_rvecs();
     comp.compute();
     cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
     comp.optimize_positions(0.0001, 10000);
     cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    */
   }
 
   return 0;
