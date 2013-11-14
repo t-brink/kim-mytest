@@ -36,12 +36,6 @@
 #include "ndarray.hpp"
 
 namespace mytest {
-  /** Utility function that should be in C++14 but not yet in C++11. */
-  template<typename T, typename ...Args>
-  std::unique_ptr<T> make_unique(Args&& ...args) {
-    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-  }
-
   /** KIM neighbor mode */
   enum KIMNeigh {
     KIM_cluster, KIM_mi_opbc_f, KIM_neigh_pure_f, KIM_neigh_rvec_f
@@ -146,6 +140,10 @@ namespace mytest {
     bool update_neighbor_list(double cutoff, double skin);
 
     /** Update ghost atom positions from central atom positions.
+
+        With a MI_OPBC_F neighbor mode, this will also enforce
+        periodic boundary conditions but only on the ghost positions
+        array, i.e. invisible from the @c positions field.
 
         Call after manipulating atomic positions even if ghost atoms
         are disabled.
@@ -475,6 +473,12 @@ namespace mytest {
      */
     Compute(std::unique_ptr<Box> box, const std::string& modelname);
 
+    /** Destructor.
+
+        Will deallocate all KIM memory, too.
+    */
+    ~Compute();
+
     /** Compute values using KIM. */
     void compute();
 
@@ -491,6 +495,121 @@ namespace mytest {
     /** Get the computed virial tensor. */
     Voigt6<double> get_virial() const {
       return virial;
+    }
+
+    /** Get position of an atom.
+
+        @param i The index of the atom.
+        @return The position of atom i.
+    */
+    Vec3D<double> get_position(unsigned i) const {
+      const double* pos = box_->get_positions_ptr();
+      return Vec3D<double>(pos[i*3 + 0], pos[i*3 + 1], pos[i*3 + 2]);
+    }
+
+    /** Set position of an atom.
+
+        Does not update neighbor lists.
+
+        @param i The index of the atom.
+        @param new_pos The new position of atom i.
+        @param update_ghosts Update the actual positions and ghost
+                             atom positions of the box. This must be
+                             set to true to actually register your
+                             change. It may be set to false when
+                             updating the positions of several atoms
+                             in a row. Then only the last call needs
+                             to set this to true. Optional, default is
+                             @c true.
+    */
+    void set_position(unsigned i, const Vec3D<double> new_pos,
+                      bool update_ghosts = true){
+      box_->positions(i,0) = new_pos[0];
+      box_->positions(i,1) = new_pos[1];
+      box_->positions(i,2) = new_pos[2];
+      if (update_ghosts)
+        box_->update_ghost_rvecs();
+    }
+
+    /** Set position of an atom.
+
+        Does not update neighbor lists.
+
+        @param i The index of the atom.
+        @param x The new x position of atom i.
+        @param y The new y position of atom i.
+        @param z The new z position of atom i.
+        @param update_ghosts Update the actual positions and ghost
+                             atom positions of the box. This must be
+                             set to true to actually register your
+                             change. It may be set to false when
+                             updating the positions of several atoms
+                             in a row. Then only the last call needs
+                             to set this to true. Optional, default is
+                             @c true.
+    */
+    void set_position(unsigned i, double x, double y, double z,
+                      bool update_ghosts = true){
+      box_->positions(i,0) = x;
+      box_->positions(i,1) = y;
+      box_->positions(i,2) = z;
+      if (update_ghosts)
+        box_->update_ghost_rvecs();
+    }
+
+    /** Move atom by specified offset.
+
+        Does not update neighbor lists.
+
+        @param i The index of the atom.
+        @param offset The offset. Will be added to the position of
+                      atom i.
+        @param update_ghosts Update the actual positions and ghost
+                             atom positions of the box. This must be
+                             set to true to actually register your
+                             change. It may be set to false when
+                             updating the positions of several atoms
+                             in a row. Then only the last call needs
+                             to set this to true. Optional, default is
+                             @c true.
+    */
+    void move_atom(unsigned i, const Vec3D<double> offset,
+                   bool update_ghosts = true){
+      box_->positions(i,0) += offset[0];
+      box_->positions(i,1) += offset[1];
+      box_->positions(i,2) += offset[2];
+      if (update_ghosts)
+        box_->update_ghost_rvecs();
+    }
+
+    /** Move atom by specified offset.
+
+        Does not update neighbor lists.
+
+        @param i The index of the atom.
+        @param offset_x The x offset. Will be added to the position of
+                        atom i.
+        @param offset_y The y offset. Will be added to the position of
+                        atom i.
+        @param offset_z The z offset. Will be added to the position of
+                        atom i.
+        @param update_ghosts Update the actual positions and ghost
+                             atom positions of the box. This must be
+                             set to true to actually register your
+                             change. It may be set to false when
+                             updating the positions of several atoms
+                             in a row. Then only the last call needs
+                             to set this to true. Optional, default is
+                             @c true.
+    */
+    void move_atom(unsigned i,
+                   double offset_x, double offset_y, double offset_z,
+                   bool update_ghosts = true){
+      box_->positions(i,0) += offset_x;
+      box_->positions(i,1) += offset_y;
+      box_->positions(i,2) += offset_z;
+      if (update_ghosts)
+        box_->update_ghost_rvecs();
     }
 
     /** Optimize box vector lengths to minimize energy.
@@ -519,8 +638,12 @@ namespace mytest {
     */
     double optimize_positions(double ftol_abs, unsigned maxeval);
 
+    /** Return number of iterations in last optimization. */
+    unsigned get_optimization_steps() const {
+      return fit_counter;
+    }
+
   private:
-  public:   
     std::unique_ptr<Box> box_;
     KIM_API_model* model;
     KIMNeigh neighbor_mode;
@@ -579,7 +702,8 @@ namespace mytest {
                                void* f_data);
 
     /** Objective function for optimizing the atom positions. */
-    static double obj_func_pos(unsigned n, const double* x, double* grad,
+    static double obj_func_pos(const std::vector<double>& x,
+                               std::vector<double>& grad,
                                void* f_data);
   };
 

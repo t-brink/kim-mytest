@@ -8,6 +8,7 @@
 #include <nlopt.hpp>
 
 #include "mytest.hpp"
+#include "utils.hpp"
 
 using namespace std;
 using namespace mytest;
@@ -382,12 +383,24 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
 }
 
 void Box::update_ghosts() {
-  for (unsigned i = 0; i != natoms_; ++i) {
-    (*ghost_positions)(i, 0) = positions(i, 0);
-    (*ghost_positions)(i, 1) = positions(i, 1);
-    (*ghost_positions)(i, 2) = positions(i, 2);
-    (*ghost_types)(i) = types(i);
-  }
+  // Copy original atoms, enforcing periodic boundaries if the
+  // neighbor mode is MI_OPBC_F.
+  if (kim_neighbor_mode == KIM_mi_opbc_f)
+    // Box is orthorhombic and periodic in all directions.
+    for (unsigned i = 0; i != natoms_; ++i) {
+      (*ghost_positions)(i, 0) = pmod(positions(i, 0), box_side_lengths_[0]);
+      (*ghost_positions)(i, 1) = pmod(positions(i, 1), box_side_lengths_[1]);
+      (*ghost_positions)(i, 2) = pmod(positions(i, 2), box_side_lengths_[2]);
+      (*ghost_types)(i) = types(i);
+    }
+  else
+    // Just assign without wrapping.
+    for (unsigned i = 0; i != natoms_; ++i) {
+      (*ghost_positions)(i, 0) = positions(i, 0);
+      (*ghost_positions)(i, 1) = positions(i, 1);
+      (*ghost_positions)(i, 2) = positions(i, 2);
+      (*ghost_types)(i) = types(i);
+    }
   unsigned ii = natoms_;
   const int alo = -static_cast<int>(ghost_shells[0]);
   const int ahi = ghost_shells[0];
@@ -402,9 +415,9 @@ void Box::update_ghosts() {
         const Vec3D<double> offset =
           double(aa)*a + double(bb)*b + double(cc)*c;
         for (unsigned i = 0; i != natoms_; ++i) {
-          (*ghost_positions)(ii, 0) = positions(i, 0) + offset[0];
-          (*ghost_positions)(ii, 1) = positions(i, 1) + offset[1];
-          (*ghost_positions)(ii, 2) = positions(i, 2) + offset[2];
+          (*ghost_positions)(ii, 0) = (*ghost_positions)(i, 0) + offset[0];
+          (*ghost_positions)(ii, 1) = (*ghost_positions)(i, 1) + offset[1];
+          (*ghost_positions)(ii, 2) = (*ghost_positions)(i, 2) + offset[2];
           (*ghost_types)(ii) = types(i);
           ++ii;
         }
@@ -642,6 +655,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
     // Add to descriptor.
     descriptor += t + " spec " + to_string(code) + "\n";
   }
+  free(pt);
   // Destroy the dummy model again.
   KIM_API_free(&query, &status);
   if (status < KIM_STATUS_OK)
@@ -689,6 +703,18 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   // ghost atoms.  Then we allocate memory for variable length data
   // and pass it to KIM.
   update_neighbor_list();
+}
+
+Compute::~Compute() {
+  int status;
+  status = model->model_destroy();
+  if (status < KIM_STATUS_OK)
+    cout << string("KIM error in line ") + to_string(__LINE__)
+      + string(" of file ") + string(__FILE__) << endl;
+  KIM_API_free(&model, &status);
+  if (status < KIM_STATUS_OK)
+    cout << string("KIM error in line ") + to_string(__LINE__)
+      + string(" of file ") + string(__FILE__) << endl;
 }
 
 
@@ -873,19 +899,18 @@ double Compute::optimize_box(double ftol_abs, unsigned maxeval) {
 }
 */
 
-double Compute::obj_func_pos(unsigned n, const double* x, double* grad,
+double Compute::obj_func_pos(const vector<double>& x, vector<double>& grad,
                              void* f_data) {
   Compute& c = *(static_cast<Compute*>(f_data));
   // Write back all positions.
   double* pos = &(c.box_->positions(0,0));
   for (unsigned i = 0; i != c.box_->natoms; ++i)
-    // TODO: wrapping of atoms?
     pos[i] = x[i];
   c.box_->update_ghost_rvecs();
   c.compute();
   ++c.fit_counter;
   // Fill gradient.
-  if (grad) {
+  if (!grad.empty()) {
     const double* f = &c.forces[0];
     for (unsigned i = 0; i != c.box_->natoms; ++i)
       grad[i] = -f[i];
@@ -919,6 +944,53 @@ double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
 
 
 
+void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
+  string neighmode_str;
+  switch (neighmode) {
+  case KIM_cluster:
+    neighmode_str = "CLUSTER";
+    break;
+  case KIM_mi_opbc_f:
+    neighmode_str = "MI_OPBC_F";
+    break;
+  case KIM_neigh_pure_f:
+    neighmode_str = "NEIGH_PURE_F";
+    break;
+  case KIM_neigh_rvec_f:
+    neighmode_str = "NEIGH_RVEC_F";
+    break;
+  default:
+    throw runtime_error("unknown neighbor mode.");
+  }
+  // Init.
+  vector<int> types;
+  types.push_back(0);
+  Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
+                                true, true, true,
+                                types, neighmode, "box"),
+               "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
+  /*
+  comp.compute();
+  cout << comp.get_energy_per_atom() << " eV/atom";
+  for (unsigned i = 0; i != 6; ++i)
+    printf("  %8.4g", comp.get_virial()(i));
+  cout << endl;
+  */
+
+  comp.move_atom(0, 0.2, 0.0, 0.0);
+  comp.compute();
+  cout << "\nBefore optimization: "
+       << comp.get_energy_per_atom()
+       << " eV/atom        " << neighmode_str << endl;
+  try {
+    comp.optimize_positions(0.001, 10000);
+    cout << "After " << comp.get_optimization_steps() << " steps: "
+         << comp.get_energy_per_atom() << " eV/atom" << endl;
+  } catch (const exception& e) {
+    cout << "NLopt failed :-(" << endl;
+  }
+}
+
 
 int main() {
   const char lat[] = "diamond";
@@ -926,7 +998,7 @@ int main() {
   vector<int> types;
   types.push_back(0);
   //types.push_back(0);
-  Box b(lat, lat_const, false, 2, 2, 2, true, true, true,
+  Box b(lat, lat_const, true, 2, 2, 2, true, true, true,
         types, KIM_neigh_pure_f, "box");
 
   b.update_neighbor_list(2.92, 0.0);
@@ -946,89 +1018,33 @@ int main() {
   // b.write_to("dump");
 
   //////////////////////////////////////////////////////////////////////
-  {
-    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
-                                  true, true, true,
-                                  types, KIM_cluster, "box"),
-                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
-    comp.compute();
-    cout << comp.get_energy_per_atom() << " eV/atom";
-    for (unsigned i = 0; i != 6; ++i)
-      printf("  %8.4g", comp.get_virial()(i));
-    cout << endl;
-
-    /*
-    comp.box_->positions(0,0) += 0.2;
-    comp.box_->update_ghost_rvecs();
-    comp.compute();
-    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    comp.optimize_positions(0.0001, 10000);
-    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    */
-  }
-
-  {
-    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
-                                  true, true, true,
-                                  types, KIM_mi_opbc_f, "box"),
-                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
-    comp.compute();
-    cout << comp.get_energy_per_atom() << " eV/atom";
-    for (unsigned i = 0; i != 6; ++i)
-      printf("  %8.4g", comp.get_virial()(i));
-    cout << endl;
-
-    /*
-    comp.box_->positions(0,0) += 0.2;
-    comp.box_->update_ghost_rvecs();
-    comp.compute();
-    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    comp.optimize_positions(0.0001, 10000);
-    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    */
-  }
-
-  {
-    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
-                                  true, true, true,
-                                  types, KIM_neigh_pure_f, "box"),
-                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
-    comp.compute();
-    cout << comp.get_energy_per_atom() << " eV/atom";
-    for (unsigned i = 0; i != 6; ++i)
-      printf("  %8.4g", comp.get_virial()(i));
-    cout << endl;
-
-    /*
-    comp.box_->positions(0,0) += 0.2;
-    comp.box_->update_ghost_rvecs();
-    comp.compute();
-    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    comp.optimize_positions(0.0001, 10000);
-    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    */
-  }
-
-  {
-    Compute comp(make_unique<Box>(lat, lat_const, true, 3, 3, 3,
-                                  true, true, true,
-                                  types, KIM_neigh_rvec_f, "box"),
-                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
-    comp.compute();
-    cout << comp.get_energy_per_atom() << " eV/atom";
-    for (unsigned i = 0; i != 6; ++i)
-      printf("  %8.4g", comp.get_virial()(i));
-    cout << endl;
-
-    /*
-    comp.box_->positions(0,0) += 0.2;
-    comp.box_->update_ghost_rvecs();
-    comp.compute();
-    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    comp.optimize_positions(0.0001, 10000);
-    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
-    */
-  }
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_cluster);
+  do_something(lat, lat_const, KIM_mi_opbc_f);
+  do_something(lat, lat_const, KIM_neigh_pure_f);
+  do_something(lat, lat_const, KIM_neigh_rvec_f);
 
   return 0;
 }
