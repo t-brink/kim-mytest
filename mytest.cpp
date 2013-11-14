@@ -5,6 +5,7 @@
 
 #include <KIM_API_C.h>
 #include <KIM_API_status.h>
+#include <nlopt.hpp>
 
 #include "mytest.hpp"
 
@@ -35,7 +36,8 @@ Box::Box(const Vec3D<double>& a_in,
     natoms_(coordinates->extent(0)), nghosts_(0), nall_(natoms_),
     name_(name),
     neigh_list_(neighmode != KIM_cluster ? natoms_ : 0),
-    neigh_rvec_(neighmode == KIM_neigh_rvec_f ? natoms_ : 0)
+    neigh_rvec_(neighmode == KIM_neigh_rvec_f ? natoms_ : 0),
+    neigh_rvec_shell_(neighmode == KIM_neigh_rvec_f ? natoms_ : 0)
 {
   if (positions.extent(0) != types.extent(0))
     throw runtime_error("types must have the same length as the "
@@ -175,8 +177,10 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
   // Reserve neighbor list space.
   if (neighmode != KIM_cluster)
     neigh_list_.resize(natoms_);
-  if (neighmode == KIM_neigh_rvec_f)
+  if (neighmode == KIM_neigh_rvec_f) {
     neigh_rvec_.resize(natoms_);
+    neigh_rvec_shell_.resize(natoms_);
+  }
 }
 
 bool Box::update_neighbor_list(double cutoff, double skin) {
@@ -272,14 +276,6 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
           if (dx*dx + dy*dy + dz*dz < cutsq) {
             neigh_list_[i].push_back(j);
             neigh_list_[j].push_back(i);
-            if (kim_neighbor_mode == KIM_neigh_rvec_f) {
-              neigh_rvec_[i].push_back(dx);
-              neigh_rvec_[i].push_back(dy);
-              neigh_rvec_[i].push_back(dz);
-              neigh_rvec_[j].push_back(-dx);
-              neigh_rvec_[j].push_back(-dy);
-              neigh_rvec_[j].push_back(-dz);
-            }
           }
         }
         // Iterate over ghosts.
@@ -289,11 +285,6 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
           const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
           if (dx*dx + dy*dy + dz*dz < cutsq) {
             neigh_list_[i].push_back(j);
-            if (kim_neighbor_mode == KIM_neigh_rvec_f) {
-              neigh_rvec_[i].push_back(dx);
-              neigh_rvec_[i].push_back(dy);
-              neigh_rvec_[i].push_back(dz);
-            }
           }
         }
       }
@@ -312,14 +303,14 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
           if (dx*dx + dy*dy + dz*dz < cutsq) {
             neigh_list_[i].push_back(j);
             neigh_list_[j].push_back(i);
-            if (kim_neighbor_mode == KIM_neigh_rvec_f) {
-              neigh_rvec_[i].push_back(dx);
-              neigh_rvec_[i].push_back(dy);
-              neigh_rvec_[i].push_back(dz);
-              neigh_rvec_[j].push_back(-dx);
-              neigh_rvec_[j].push_back(-dy);
-              neigh_rvec_[j].push_back(-dz);
-            }
+            neigh_rvec_[i].push_back(dx);
+            neigh_rvec_[i].push_back(dy);
+            neigh_rvec_[i].push_back(dz);
+            neigh_rvec_[j].push_back(-dx);
+            neigh_rvec_[j].push_back(-dy);
+            neigh_rvec_[j].push_back(-dz);
+            neigh_rvec_shell_[i].push_back(Vec3D<int>(0,0,0));
+            neigh_rvec_shell_[j].push_back(Vec3D<int>(0,0,0));
           }
         }
         // Iterate over ghosts.
@@ -347,6 +338,7 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
                   neigh_rvec_[i].push_back(dx);
                   neigh_rvec_[i].push_back(dy);
                   neigh_rvec_[i].push_back(dz);
+                  neigh_rvec_shell_[i].push_back(Vec3D<int>(aa,bb,cc));
                 }
               }
             }
@@ -393,18 +385,32 @@ void Box::update_ghosts() {
 
 void Box::update_ghost_rvecs() {
   update_ghosts();
-  if (kim_neighbor_mode == KIM_neigh_rvec_f)
+  if (kim_neighbor_mode == KIM_neigh_rvec_f) {
     for (unsigned i = 0; i != natoms_; ++i) {
       const unsigned jjmax = neigh_list_[i].size();
       const auto& neigh_i = neigh_list_[i];
       auto& rvec_i = neigh_rvec_[i];
+      const auto& shells_i = neigh_rvec_shell_[i];
       for (unsigned jj = 0; jj != jjmax; ++jj) {
         const unsigned j = neigh_i[jj];
-        rvec_i[jj*3 + 0] = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
-        rvec_i[jj*3 + 1] = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
-        rvec_i[jj*3 + 2] = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
+        const Vec3D<double> offset(shells_i[jj][0] * a[0]
+                                   + shells_i[jj][1] * b[0]
+                                   + shells_i[jj][2] * c[0],
+                                   shells_i[jj][0] * a[1]
+                                   + shells_i[jj][1] * b[1]
+                                   + shells_i[jj][2] * c[1],
+                                   shells_i[jj][0] * a[2]
+                                   + shells_i[jj][1] * b[2]
+                                   + shells_i[jj][2] * c[2]);
+        rvec_i[jj*3 + 0] =
+          (*ghost_positions)(j,0) - (*ghost_positions)(i,0) + offset[0];
+        rvec_i[jj*3 + 1] =
+          (*ghost_positions)(j,1) - (*ghost_positions)(i,1) + offset[1];
+        rvec_i[jj*3 + 2] =
+          (*ghost_positions)(j,2) - (*ghost_positions)(i,2) + offset[2];
       }
     }
+  }
 }
 
 
@@ -706,6 +712,7 @@ void Compute::compute() {
       throw runtime_error("unsupported neighbor mode.");
   }
 
+  /*
   cout << "                                                                 "
        << "               "
        << forces[0] << " " << forces[1] << " " << forces[2]
@@ -716,6 +723,7 @@ void Compute::compute() {
        << "  ::  "
        << particleEnergy[0]
        << endl;
+  */
 }
 
 
@@ -793,6 +801,91 @@ void Compute::update_neighbor_list() {
 }
 
 
+// Fitting /////////////////////////
+
+/*
+double Compute::obj_func_box(unsigned n, const double* x, double* grad,
+                                    void* f_data) {
+  Compute& c = *(static_cast<Compute*>(f_data));
+  if (n != 3)
+    throw runtime_error("This objective function only works with "
+                        "3 parameters.");
+  // Scale box, we assume the neighbor list doesn't change (TODO?).
+  c.box_->scale_to(x[0], x[1], x[2]);
+  c.compute();
+  ++c.fit_counter;
+  // Gradient.
+  if (grad)
+    throw runtime_error("Gradient not supported for box optimization.");
+  // Objective function value is energy.
+  return c.energy;
+}
+
+double Compute::optimize_box(double ftol_abs, unsigned maxeval) {
+  vector<double> lengths = { box_->box_side_lengths[0],
+                             box_->box_side_lengths[1],
+                             box_->box_side_lengths[2] };
+  vector<double> lb = { 0.0, 0.0, 0.0 }; // Lengths may not be negative.
+  // TODO: We use a gradient-free algorithm for now, although the
+  // gradient should be obtainable from the virial (is it even exactly
+  // the virial?).
+  double obj_val;
+  nlopt::opt optimizer(nlopt::LN_SBPLX, 3);
+  optimizer.set_min_objective(Compute::obj_func_box, this);
+  optimizer.set_lower_bounds(lb);
+  optimizer.set_initial_step(0.05); // This may not be too big!  TODO:
+                                    // user-definable or better
+                                    // heuristics?
+  fit_counter = 0;
+  optimizer.set_maxeval(maxeval);
+  optimizer.set_ftol_abs(ftol_abs);
+  optimizer.optimize(lengths, obj_val);
+  return obj_val;
+}
+*/
+
+double Compute::obj_func_pos(unsigned n, const double* x, double* grad,
+                             void* f_data) {
+  Compute& c = *(static_cast<Compute*>(f_data));
+  // Write back all positions.
+  double* pos = &(c.box_->positions(0,0));
+  for (unsigned i = 0; i != c.box_->natoms; ++i)
+    // TODO: wrapping of atoms?
+    pos[i] = x[i];
+  c.box_->update_ghost_rvecs();
+  c.compute();
+  ++c.fit_counter;
+  // Fill gradient.
+  if (grad) {
+    const double* f = &c.forces[0];
+    for (unsigned i = 0; i != c.box_->natoms; ++i)
+      grad[i] = -f[i];
+  }
+  // Objective function value is energy.
+  return c.energy;
+}
+
+double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
+  // Get coordinates as vector.
+  Array2D<double>& pos = box_->positions;
+  const int nparams = pos.extent(0)*pos.extent(1);
+  const double* p = &pos(0,0);
+  vector<double> pos_vec(p, p+nparams);
+  // Other good algorithms:
+  //   * NLOPT_LD_LBFGS
+  //   * NLOPT_LD_TNEWTON_PRECOND_RESTART
+  //   * NLOPT_LD_VAR2
+  double obj_val;
+  nlopt::opt optimizer(nlopt::LD_TNEWTON_PRECOND_RESTART, nparams);
+  optimizer.set_min_objective(Compute::obj_func_pos, this);
+  fit_counter = 0;
+  optimizer.set_maxeval(maxeval);
+  optimizer.set_ftol_abs(ftol_abs);
+  optimizer.optimize(pos_vec, obj_val);
+  return obj_val;
+}
+
+
 
 
 
@@ -833,6 +926,15 @@ int main() {
     for (unsigned i = 0; i != 6; ++i)
       printf("  %8.4g", comp.get_virial()(i));
     cout << endl;
+
+    /*
+    comp.box_->positions(0,0) += 0.2;
+    comp.box_->update_ghost_rvecs();
+    comp.compute();
+    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    comp.optimize_positions(0.0001, 10000);
+    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    */
   }
 
   {
@@ -845,6 +947,15 @@ int main() {
     for (unsigned i = 0; i != 6; ++i)
       printf("  %8.4g", comp.get_virial()(i));
     cout << endl;
+
+    /*
+    comp.box_->positions(0,0) += 0.2;
+    comp.box_->update_ghost_rvecs();
+    comp.compute();
+    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    comp.optimize_positions(0.0001, 10000);
+    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    */
   }
 
   {
@@ -857,6 +968,13 @@ int main() {
     for (unsigned i = 0; i != 6; ++i)
       printf("  %8.4g", comp.get_virial()(i));
     cout << endl;
+
+    comp.box_->positions(0,0) += 0.2;
+    comp.box_->update_ghost_rvecs();
+    comp.compute();
+    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    comp.optimize_positions(0.0001, 10000);
+    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
   }
 
   {
@@ -869,6 +987,13 @@ int main() {
     for (unsigned i = 0; i != 6; ++i)
       printf("  %8.4g", comp.get_virial()(i));
     cout << endl;
+
+    comp.box_->positions(0,0) += 0.2;
+    comp.box_->update_ghost_rvecs();
+    comp.compute();
+    cout << "Before optimization: " << comp.get_energy_per_atom() << " eV/atom" << endl;
+    comp.optimize_positions(0.0001, 10000);
+    cout << "After " << comp.fit_counter << " steps: " << comp.get_energy_per_atom() << " eV/atom" << endl;
   }
 
   return 0;

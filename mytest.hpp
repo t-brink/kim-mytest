@@ -365,7 +365,8 @@ namespace mytest {
 
     /** Uniformly scale box.
 
-        Includes scaling of atom positions.
+        Includes scaling of atom positions.  Implicitly calls
+        update_ghost_rvecs().
 
         @param factor The factor that the box lengths will be
                       multiplied with.
@@ -374,7 +375,8 @@ namespace mytest {
 
     /** Scale box in a, b, and c direction.
 
-        Includes scaling of atom positions.
+        Includes scaling of atom positions.  Implicitly calls
+        update_ghost_rvecs().
 
         @param factor_a Multiply box vector a by this factor.
         @param factor_b Multiply box vector b by this factor.
@@ -384,7 +386,8 @@ namespace mytest {
 
     /** Set box vector lengths.
 
-        Includes scaling of atom positions.
+        Includes scaling of atom positions.  Implicitly calls
+        update_ghost_rvecs().
 
         @param len_a Scale box vector a to have this length.
         @param len_b Scale box vector b to have this length.
@@ -394,7 +397,8 @@ namespace mytest {
 
     /** Deform box by given deformation matrix.
 
-        Includes scaling of atom positions.
+        Includes scaling of atom positions.  Implicitly calls
+        update_ghost_rvecs().
 
         A deformation matrix is defined is the strain tensor plus the
         identity matrix: ε<sub>ij</sub> + δ<sub>ij</sub>.
@@ -408,7 +412,8 @@ namespace mytest {
 
     /** Deform box to fit the given box vectors.
 
-        Includes scaling of atom positions.
+        Includes scaling of atom positions.  Implicitly calls
+        update_ghost_rvecs().
 
         @param new_a The new box vector a.
         @param new_b The new box vector b.
@@ -450,6 +455,7 @@ namespace mytest {
     std::unique_ptr< Array1D<int> > ghost_types;
     std::vector< std::vector<int> > neigh_list_;
     std::vector< std::vector<double> > neigh_rvec_;
+    std::vector< std::vector< Vec3D<int> > > neigh_rvec_shell_;
   };
 
 
@@ -487,7 +493,34 @@ namespace mytest {
       return virial;
     }
 
+    /** Optimize box vector lengths to minimize energy.
+
+        Does not update neighbor lists.
+
+        @param ftol_abs Convergence criterium: maximum change of
+                        objective function value between two
+                        iterations.
+        @param maxeval Maximum number of iterations.
+
+        @return The potential energy of the optimized box.
+    */
+    double optimize_box(double ftol_abs, unsigned maxeval);
+
+    /** Optimize atomic positions to minimize energy.
+
+        Does not update neighbor lists.
+
+        @param ftol_abs Convergence criterium: maximum change of
+                        objective function value between two
+                        iterations.
+        @param maxeval Maximum number of iterations.
+
+        @return The potential energy of the optimized box.
+    */
+    double optimize_positions(double ftol_abs, unsigned maxeval);
+
   private:
+  public:   
     std::unique_ptr<Box> box_;
     KIM_API_model* model;
     KIMNeigh neighbor_mode;
@@ -508,6 +541,9 @@ namespace mytest {
     // this class not thread safe!
     unsigned kim_iter_pos;
     bool kim_wants_rvec;
+    // Some counter used when fitting to get number of iterations (not
+    // thread safe obviously).
+    unsigned fit_counter;
 
     /** Get neighbor list function for KIM.
 
@@ -534,6 +570,17 @@ namespace mytest {
         skin or if the cutoff has changed (increased).
     */
     void update_neighbor_list();
+
+    /** Objective function for optimizing the box.
+
+        This optimizes the length of the box vectors.
+    */
+    static double obj_func_box(unsigned n, const double* x, double* grad,
+                               void* f_data);
+
+    /** Objective function for optimizing the atom positions. */
+    static double obj_func_pos(unsigned n, const double* x, double* grad,
+                               void* f_data);
   };
 
 }
