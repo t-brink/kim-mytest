@@ -767,14 +767,12 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
     if (status < KIM_STATUS_OK)
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
-    vector<int> param_shape_(100); // TODO: KIM has no way to get the    
-                                   // rank of the parameter, so we       
-                                   // have to hope (quite reasonably)    
-                                   // that it will never be bigger       
-                                   // than 100.                          
-    const int param_rank = model->get_shape_by_index(param_index,
-                                                     &param_shape_[0],
-                                                     &status);
+    const int param_rank = model->get_rank_by_index(param_index, &status);
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+    vector<int> param_shape_(param_rank);
+    model->get_shape_by_index(param_index, &param_shape_[0], &status);
     if (status < KIM_STATUS_OK)
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
