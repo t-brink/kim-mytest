@@ -757,7 +757,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
 
   // Store free parameter names of the model.
   int n_params;
-  const char* param_names = model->get_free_params(&n_params, &status);
+  char* param_names = model->get_free_params(&n_params, &status);
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
@@ -790,6 +790,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                                forward_as_tuple(param_name, param_shape,
                                                 param_index));
   }
+  free(param_names);
 
   // Now that we know the cutoff, we calculate neighbor lists and
   // ghost atoms.  Then we allocate memory for variable length data
