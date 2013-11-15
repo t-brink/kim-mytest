@@ -771,6 +771,18 @@ namespace mytest {
     */
     void switch_boxes(Compute& other);
 
+    /** Store a new box in the object and return the old one.
+
+        Both boxes must have the same KIM neighbor list type.
+
+        This will implicitly call Box::update_neighbor_list() to
+        ensure that correct cutoffs are set etc.
+
+        @param new_box The new box.
+        @return The old box.
+    */
+    std::unique_ptr<Box> change_box(std::unique_ptr<Box> new_box);
+
   private:
     std::unique_ptr<Box> box_;
     const std::string modelname_;
@@ -836,6 +848,9 @@ namespace mytest {
     void set_parameter_impl(const std::string& param_name,
                             const std::vector<unsigned>& indices,
                             T value, bool reinit);
+
+    /** What it says on the tin. */
+    void update_kim_after_box_change();
   };
 
 }

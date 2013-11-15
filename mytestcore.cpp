@@ -1159,6 +1159,19 @@ void Compute::switch_boxes(Compute& other) {
   // Swap boxes.
   box_.swap(other.box_);
   // Reset KIM data on this object.
+  update_kim_after_box_change();
+  // Reset KIM data on other object.
+  other.update_kim_after_box_change();
+}
+
+unique_ptr<Box> Compute::change_box(unique_ptr<Box> new_box) {
+  box_.swap(new_box);
+  box_->update_neighbor_list(cutoff, 0.0); // TODO: skin
+  update_kim_after_box_change();
+  return new_box; // Which is now the old box.
+}
+
+void Compute::update_kim_after_box_change() {
   int status;
   const unsigned n = box_->nall;
   forces.resize(3 * n);
@@ -1176,27 +1189,7 @@ void Compute::switch_boxes(Compute& other) {
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
-  // Reset KIM data on other object.
-  const unsigned n2 = other.box_->nall;
-  Box& b = *other.box_;
-  other.forces.resize(3 * n2);
-  other.particleEnergy.resize(n2);
-  other.particleVirial.resize(6 * n2);
-  other.model->setm_data(&status, 7*4, // TODO: use indices!
-                         "numberOfParticles", 1, &b.nall,                  1,
-                         "boxSideLengths",    3, &b.box_side_lengths[0],   1,
-                         "coordinates",    3*n2, b.get_positions_ptr(),    1,
-                         "particleTypes",    n2, b.get_types_ptr(),        1,
-                         "forces",         3*n2, &other.forces[0],         1,
-                         "particleEnergy",   n2, &other.particleEnergy[0], 1,
-                         "particleVirial", 6*n2, &other.particleVirial[0], 1
-                         );
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
 }
-
-
 
 
 
