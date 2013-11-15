@@ -654,7 +654,8 @@ static const string KIM_DESC =
 
 
 Compute::Compute(unique_ptr<Box> box, const string& modelname)
-  : box_(move(box)), neighbor_mode(box_->kim_neighbor_mode)
+  : box_(move(box)), modelname_(modelname),
+    neighbor_mode(box_->kim_neighbor_mode)
 {
   int status;
 
@@ -1081,6 +1082,56 @@ double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
   optimizer.optimize(pos_vec, obj_val);
   return obj_val;
 }
+
+
+
+void Compute::switch_boxes(Compute& other) {
+  // Check neighbor list mode.
+  if (neighbor_mode != other.neighbor_mode)
+    throw runtime_error("Neighbor list modes do not match.");
+  // Check model.
+  if (modelname_ != other.modelname_)
+    throw runtime_error("KIM models do not match.");
+  // Swap boxes.
+  box_.swap(other.box_);
+  // Reset KIM data on this object.
+  int status;
+  const unsigned n = box_->nall;
+  forces.resize(3 * n);
+  particleEnergy.resize(n);
+  particleVirial.resize(6 * n);
+  model->setm_data(&status, 7*4, // TODO: use indices!
+                   "numberOfParticles",   1, &box_->nall,                1,
+                   "boxSideLengths",      3, &box_->box_side_lengths[0], 1,
+                   "coordinates",       3*n, box_->get_positions_ptr(),  1,
+                   "particleTypes",       n, box_->get_types_ptr(),      1,
+                   "forces",            3*n, &forces[0],                 1,
+                   "particleEnergy",      n, &particleEnergy[0],         1,
+                   "particleVirial",    6*n, &particleVirial[0],         1
+                   );
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
+  // Reset KIM data on other object.
+  const unsigned n2 = other.box_->nall;
+  Box& b = *other.box_;
+  other.forces.resize(3 * n2);
+  other.particleEnergy.resize(n2);
+  other.particleVirial.resize(6 * n2);
+  other.model->setm_data(&status, 7*4, // TODO: use indices!
+                         "numberOfParticles", 1, &b.nall,                  1,
+                         "boxSideLengths",    3, &b.box_side_lengths[0],   1,
+                         "coordinates",    3*n2, b.get_positions_ptr(),    1,
+                         "particleTypes",    n2, b.get_types_ptr(),        1,
+                         "forces",         3*n2, &other.forces[0],         1,
+                         "particleEnergy",   n2, &other.particleEnergy[0], 1,
+                         "particleVirial", 6*n2, &other.particleVirial[0], 1
+                         );
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
+}
+
 
 
 

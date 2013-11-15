@@ -762,8 +762,18 @@ namespace mytest {
       return fit_counter;
     }
 
+    /** Switch the contained Box objects between two Compute objects.
+
+        Both boxes must have the same KIM neighbor list type and use
+        the same KIM model.
+
+        @param other Another Compute object with which to switch boxes.
+    */
+    void switch_boxes(Compute& other);
+
   private:
     std::unique_ptr<Box> box_;
+    const std::string modelname_;
     KIM_API_model* model;
     KIMNeigh neighbor_mode;
     // Model input.
