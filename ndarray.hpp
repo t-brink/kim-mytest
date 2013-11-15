@@ -465,7 +465,12 @@ namespace mytest {
     T* data;
     bool keep_data;
   public:
-    const T& xx, yy, zz, yz, xz, xy;
+    const T& xx;
+    const T& yy;
+    const T& zz;
+    const T& yz;
+    const T& xz;
+    const T& xy;
   };
 
 
