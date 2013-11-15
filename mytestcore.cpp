@@ -166,12 +166,76 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
       atoms.push_back(t_atom(Vec3D<double>(0.25, 0.25, 0.25) * lattice_const,
                              types_in[0]));
     }
-  } else if (lattice == "B1") {
-    throw runtime_error("not implemented.");
-  } else if (lattice == "B2") {
-    throw runtime_error("not implemented.");
-  } else if (lattice == "B3") {
-    throw runtime_error("not implemented.");
+  } else if (lattice == "B1") { // NaCl
+    if (cubic) {
+      unit_a = Vec3D<double>(lattice_const, 0.0, 0.0);
+      unit_b = Vec3D<double>(0.0, lattice_const, 0.0);
+      unit_c = Vec3D<double>(0.0, 0.0, lattice_const);
+      atoms.push_back(t_atom(Vec3D<double>(0.0, 0.0, 0.0) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.5, 0.0, 0.0) * lattice_const,
+                             types_in[1]));
+      atoms.push_back(t_atom(Vec3D<double>(0.0, 0.5, 0.5) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.5, 0.5, 0.5) * lattice_const,
+                             types_in[1]));
+      atoms.push_back(t_atom(Vec3D<double>(0.5, 0.0, 0.5) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.0, 0.0, 0.5) * lattice_const,
+                             types_in[1]));
+      atoms.push_back(t_atom(Vec3D<double>(0.5, 0.5, 0.0) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.0, 0.5, 0.0) * lattice_const,
+                             types_in[1]));
+
+    } else {
+      unit_a = Vec3D<double>(0.0, 0.5, 0.5) * lattice_const;
+      unit_b = Vec3D<double>(0.5, 0.0, 0.5) * lattice_const;
+      unit_c = Vec3D<double>(0.5, 0.5, 0.0) * lattice_const;
+      atoms.push_back(t_atom(Vec3D<double>(0.0, 0.0, 0.0) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.5, 0.0, 0.0) * lattice_const,
+                             types_in[1]));
+    }
+  } else if (lattice == "B2") { // CsCl
+    unit_a = Vec3D<double>(lattice_const, 0.0, 0.0);
+    unit_b = Vec3D<double>(0.0, lattice_const, 0.0);
+    unit_c = Vec3D<double>(0.0, 0.0, lattice_const);
+    atoms.push_back(t_atom(Vec3D<double>(0.0, 0.0, 0.0) * lattice_const,
+                           types_in[0]));
+    atoms.push_back(t_atom(Vec3D<double>(0.5, 0.5, 0.5) * lattice_const,
+                           types_in[1]));
+  } else if (lattice == "B3") { // zincblende
+    if (cubic) {
+      unit_a = Vec3D<double>(lattice_const, 0.0, 0.0);
+      unit_b = Vec3D<double>(0.0, lattice_const, 0.0);
+      unit_c = Vec3D<double>(0.0, 0.0, lattice_const);
+      atoms.push_back(t_atom(Vec3D<double>(0.00, 0.00, 0.00) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.25, 0.25, 0.25) * lattice_const,
+                             types_in[1]));
+      atoms.push_back(t_atom(Vec3D<double>(0.00, 0.50, 0.50) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.25, 0.75, 0.75) * lattice_const,
+                             types_in[1]));
+      atoms.push_back(t_atom(Vec3D<double>(0.50, 0.00, 0.50) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.75, 0.25, 0.75) * lattice_const,
+                             types_in[1]));
+      atoms.push_back(t_atom(Vec3D<double>(0.50, 0.50, 0.00) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.75, 0.75, 0.25) * lattice_const,
+                             types_in[1]));
+
+    } else {
+      unit_a = Vec3D<double>(0.0, 0.5, 0.5) * lattice_const;
+      unit_b = Vec3D<double>(0.5, 0.0, 0.5) * lattice_const;
+      unit_c = Vec3D<double>(0.5, 0.5, 0.0) * lattice_const;
+      atoms.push_back(t_atom(Vec3D<double>(0.00, 0.00, 0.00) * lattice_const,
+                             types_in[0]));
+      atoms.push_back(t_atom(Vec3D<double>(0.25, 0.25, 0.25) * lattice_const,
+                             types_in[1]));
+    }
   } else {
     throw runtime_error("unknown lattice");
   }
