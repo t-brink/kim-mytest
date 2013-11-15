@@ -3,6 +3,7 @@
 
 namespace mytest {
   /** Modulo with the same semantics as python (or maths). */
+  inline
   double pmod(double x, double N) {
     return (x < 0) ? fmod(fmod(x, N) + N, N) : fmod(x, N);
   }
@@ -12,6 +13,7 @@ namespace mytest {
       Will only actually do the modulo if the last argument is @c
       true.
   */
+  inline
   double pmodif(double x, double N, bool do_mod) {
     if (do_mod)
       return (x < 0) ? fmod(fmod(x, N) + N, N) : fmod(x, N);
