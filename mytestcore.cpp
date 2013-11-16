@@ -9,7 +9,6 @@
 #include <nlopt.hpp>
 
 #include "mytestcore.hpp"
-#include "utils.hpp"
 
 using namespace std;
 using namespace mytest;
@@ -277,6 +276,43 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
     neigh_rvec_shell_.resize(natoms_);
   }
 }
+
+Box::Box(const Box& other)
+  : box_side_lengths(box_side_lengths_), // Public const references.
+    a(a_), b(b_), c(c_),
+    periodic(periodic_),
+    kim_neighbor_mode(other.kim_neighbor_mode),
+    natoms(natoms_), nghosts(nghosts_), nall(nall_),
+    positions(other.positions.extent(0), // Public data.
+              other.positions.extent(1)),
+    types(other.types.extent(0)),
+    box_side_lengths_(other.box_side_lengths_), // Private data.
+    a_(other.a_), b_(other.b_), c_(other.c_),
+    periodic_(other.periodic_),
+    natoms_(other.natoms_), nghosts_(other.nghosts_), nall_(other.nall_),
+    name_(other.name_),
+    ghost_shells(other.ghost_shells),
+    ghost_positions(make_unique<Array2D<double>>(
+                                    other.ghost_positions->extent(0),
+                                    other.ghost_positions->extent(1))),
+    ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
+    neigh_list_(other.neigh_list_),
+    neigh_rvec_(other.neigh_rvec_),
+    neigh_rvec_shell_(other.neigh_rvec_shell_)
+{
+  for (int i = 0; i != positions.extent(0); ++i)
+    for (int j = 0; j != positions.extent(1); ++j)
+      positions(i,j) = other.positions(i,j);
+  for (int i = 0; i != types.extent(0); ++i)
+    types(i) = other.types(i);
+  for (int i = 0; i != ghost_positions->extent(0); ++i)
+    for (int j = 0; j != ghost_positions->extent(1); ++j)
+      (*ghost_positions)(i,j) = (*other.ghost_positions)(i,j);
+  for (int i = 0; i != ghost_types->extent(0); ++i)
+    (*ghost_types)(i) = (*other.ghost_types)(i);
+}
+
+
 
 bool Box::update_neighbor_list(double cutoff, double skin) {
   const double cut = (1 + skin) * cutoff;
@@ -1166,10 +1202,10 @@ void Compute::switch_boxes(Compute& other) {
 
 unique_ptr<Box> Compute::change_box(unique_ptr<Box> new_box) {
   box_.swap(new_box);
-  box_->update_neighbor_list(cutoff, 0.0); // TODO: skin
   update_kim_after_box_change();
   return new_box; // Which is now the old box.
 }
+
 
 void Compute::update_kim_after_box_change() {
   int status;

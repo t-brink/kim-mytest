@@ -1,8 +1,32 @@
+/*
+  Copyright (c) 2013 Tobias Brink
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 #include <iostream>
 #include <cstdio>
 
-#include "mytestcore.hpp"
 #include "utils.hpp"
+#include "mytestcore.hpp"
+#include "elastic.hpp"
 
 using namespace std;
 using namespace mytest;
@@ -59,6 +83,7 @@ int main() {
   unique_ptr<Box> p = make_unique<Box>("B2", 2.668, false, 3, 3, 3,
                                        true, true, true,
                                        types2, KIM_neigh_rvec_f, "box");
+  p->update_neighbor_list(3.0,0.0);
   p = comp1.change_box(move(p));
   comp1.compute();
   cout << "comp1 = " << comp1.get_energy_per_atom() << " eV/atom" << endl;
@@ -66,6 +91,20 @@ int main() {
   comp1.compute();
   cout << "comp1 = " << comp1.get_energy_per_atom() << " eV/atom" << endl;
 
+  const vector<int> typesSi{ 0 };
+  const vector<int> typesC{ 1 };
+  const vector<int> typesSiC{ 0, 1 };
+  Compute comp(make_unique<Box>("B3", 4.359, false, 1, 1, 1,
+                                true, true, true,
+                                typesSiC, KIM_neigh_rvec_f, "box1"),
+               "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
+  comp.compute();
+  cout << comp.get_energy_per_atom() << " eV/atom" << endl;
+  const BMParams bmp = bulk_modulus_energy(comp);
+  cout << "E0  = " << bmp.E0 / comp.get_natoms() << " eV/atom\n"
+       << "V0  = " << bmp.V0 / comp.get_natoms() << " A^3/atom\n"
+       << "B0  = " << bmp.B0 * 160.2177 << " GPa\n"
+       << "B0' = " << bmp.dB0_dp << endl;
 
   return 0;
 }

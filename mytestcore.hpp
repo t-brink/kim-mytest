@@ -34,6 +34,7 @@
 #include <KIM_API.h>
 
 #include "ndarray.hpp"
+#include "utils.hpp"
 
 namespace mytest {
   /** KIM neighbor mode */
@@ -121,6 +122,9 @@ namespace mytest {
         bool periodic_a, bool periodic_b, bool periodic_c,
         const std::vector<int>& types,
         KIMNeigh neighmode, const std::string& name);
+
+    /** Copy constructor. */
+    Box(const Box& other);
 
     virtual ~Box() {}
 
@@ -246,7 +250,9 @@ namespace mytest {
 
         @return Volume of the box.
     */
-    double calc_volume() const;
+    double calc_volume() const {
+      return dot(a_, cross(b_, c_));
+    }
 
     /** Calculate distance between to atoms i and j.
 
@@ -369,7 +375,9 @@ namespace mytest {
         @param factor The factor that the box lengths will be
                       multiplied with.
     */
-    void scale(double factor);
+    void scale(double factor) {
+      deform(Voigt6<double>(factor, factor, factor, 0, 0, 0));
+    }
 
     /** Scale box in a, b, and c direction.
 
@@ -554,6 +562,11 @@ namespace mytest {
         return it->second;
       else
         throw std::runtime_error("unknown type name");
+    }
+
+    /** Return number of atoms in the simulation box. */
+    unsigned get_natoms() const {
+      return box_->natoms;
     }
 
     /** Get position of an atom.
@@ -773,15 +786,18 @@ namespace mytest {
 
     /** Store a new box in the object and return the old one.
 
-        Both boxes must have the same KIM neighbor list type.
-
-        This will implicitly call Box::update_neighbor_list() to
-        ensure that correct cutoffs are set etc.
+        Both boxes must have the same KIM neighbor list type. Neighbor
+        lists are not updated.
 
         @param new_box The new box.
         @return The old box.
     */
     std::unique_ptr<Box> change_box(std::unique_ptr<Box> new_box);
+
+    /** Return a copy of the internal simulation box. */
+    std::unique_ptr<Box> copy_box() const {
+      return make_unique<Box>(*box_);
+    }
 
   private:
     std::unique_ptr<Box> box_;

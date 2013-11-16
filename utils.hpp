@@ -1,6 +1,9 @@
 #ifndef MYTEST_UTILS_HPP
 #define MYTEST_UTILS_HPP
 
+#include <cmath>
+#include <memory>
+
 namespace mytest {
   /** Modulo with the same semantics as python (or maths). */
   inline
