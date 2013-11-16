@@ -1106,11 +1106,16 @@ void Compute::set_parameter(const string& param_name,
 double Compute::obj_func_box(const vector<double>& x, vector<double>& grad,
                              void* f_data) {
   Compute& c = *(static_cast<Compute*>(f_data));
-  if (x.size() != 3)
+  if (x.size() != 3 && x.size() != 1)
     throw runtime_error("This objective function only works with "
-                        "3 parameters.");
+                        "1 or 3 parameters.");
   // Scale box, we assume the neighbor list doesn't change (TODO?).
-  c.box_->scale_to(x[0], x[1], x[2]);
+  if (x.size() == 3)
+    c.box_->scale_to(x[0], x[1], x[2]);
+  else {
+    const double factor = x[0] / c.box_->box_side_lengths[0];
+    c.box_->scale(factor);
+  }
   c.compute();
   ++c.fit_counter;
   // Gradient.
@@ -1120,18 +1125,23 @@ double Compute::obj_func_box(const vector<double>& x, vector<double>& grad,
   return c.energy;
 }
 
-double Compute::optimize_box(double ftol_abs, unsigned maxeval) {
-  vector<double> lengths = { box_->box_side_lengths[0],
-                             box_->box_side_lengths[1],
-                             box_->box_side_lengths[2] };
-  vector<double> lb = { 0.0, 0.0, 0.0 }; // Lengths may not be negative.
+double Compute::optimize_box(double ftol_abs, unsigned maxeval,
+                             bool isotropic) {
+  vector<double> lengths;
+  lengths.push_back(box_->box_side_lengths[0]);
+  if (!isotropic) {
+    lengths.push_back(box_->box_side_lengths[1]);
+    lengths.push_back(box_->box_side_lengths[2]);
+  }
+  static const vector<double> lb1 = { 0.0 }; // Lengths may not be negative.
+  static const vector<double> lb3 = { 0.0, 0.0, 0.0 };
   // TODO: We use a gradient-free algorithm for now, although the
   // gradient should be obtainable from the virial (is it even exactly
   // the virial?).
   double obj_val;
-  nlopt::opt optimizer(nlopt::LN_SBPLX, 3);
+  nlopt::opt optimizer(nlopt::LN_SBPLX, isotropic ? 1 : 3);
   optimizer.set_min_objective(Compute::obj_func_box, this);
-  optimizer.set_lower_bounds(lb);
+  optimizer.set_lower_bounds(isotropic ? lb1 : lb3);
   optimizer.set_initial_step(0.05); // This may not be too big!  TODO:
                                     // user-definable or better
                                     // heuristics?
