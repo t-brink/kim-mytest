@@ -36,6 +36,7 @@
 #include "ndarray.hpp"
 #include "utils.hpp"
 
+/** The main namespace. */
 namespace mytest {
   /** KIM neighbor mode */
   enum KIMNeigh {

@@ -100,11 +100,61 @@ int main() {
                "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
   comp.compute();
   cout << comp.get_energy_per_atom() << " eV/atom" << endl;
-  const BMParams bmp = bulk_modulus_energy(comp);
+  //comp.move_atom(0, 0.1, 0.0, 0.0);
+  vector<double> volumes1;
+  vector<double> energies;
+  const BMParams bmp = bulk_modulus_energy(comp, volumes1, energies);
   cout << "E0  = " << bmp.E0 / comp.get_natoms() << " eV/atom\n"
        << "V0  = " << bmp.V0 / comp.get_natoms() << " A^3/atom\n"
        << "B0  = " << bmp.B0 * 160.2177 << " GPa\n"
        << "B0' = " << bmp.dB0_dp << endl;
+  vector<double> volumes2;
+  vector<double> pressures;
+  const BMParams bmpp = bulk_modulus_pressure(comp, volumes2, pressures);
+  cout << "V0  = " << bmpp.V0 / comp.get_natoms() << " A^3/atom\n"
+       << "B0  = " << bmpp.B0 * 160.2177 << " GPa\n"
+       << "B0' = " << bmpp.dB0_dp << endl;
+  {
+    ofstream outfile("EV.gnuplot");
+    outfile << "set xzeroaxis" << endl
+            << "plot "
+
+            << bmp.E0<<" + 9*"<<bmpp.V0<<"*"<<bmpp.B0<<"/16 * "
+            << "((("<<bmpp.V0<<"/x)**(2./3.) - 1)**3 * "<<bmpp.dB0_dp<<" + "
+            << "(("<<bmpp.V0<<"/x)**(2./3.) - 1)**2 * "
+            << "(6 - 4*("<<bmpp.V0<<"/x)**(2./3.)))"
+            << "with lines lt 1 lc 1 title 'pressure-derived', "
+
+            << bmp.E0<<" + 9*"<<bmp.V0<<"*"<<bmp.B0<<"/16 * "
+            << "((("<<bmp.V0<<"/x)**(2./3.) - 1)**3 * "<<bmp.dB0_dp<<" + "
+            << "(("<<bmp.V0<<"/x)**(2./3.) - 1)**2 * "
+            << "(6 - 4*("<<bmp.V0<<"/x)**(2./3.)))"
+            << "with lines lt 1 lc 3 title 'energy-derived', "
+
+            << "'-' using 1:2 with points pt 7 title 'data'" << endl;
+    for (unsigned i = 0; i != volumes1.size(); ++i)
+      outfile << volumes1[i] <<  " " << energies[i] << endl;
+    outfile << "e" << endl;
+  }
+  {
+    ofstream outfile("pV.gnuplot");
+    outfile << "set xzeroaxis" << endl
+            << "plot "
+            << "3*"<<bmpp.B0<<"/2 * "
+            << "(("<<bmpp.V0<<"/x)**(7./3.) - ("<<bmpp.V0<<"/x)**(5./3.)) * "
+            << "(1 + 0.75*("<<bmpp.dB0_dp<<" - 4) * "
+            << "(("<<bmpp.V0<<"/x)**(2./3.) - 1))"
+            << "with lines lt 1 lc 1 title 'pressure-derived', "
+            << "3*"<<bmp.B0<<"/2 * "
+            << "(("<<bmp.V0<<"/x)**(7./3.) - ("<<bmp.V0<<"/x)**(5./3.)) * "
+            << "(1 + 0.75*("<<bmp.dB0_dp<<" - 4) * "
+            << "(("<<bmp.V0<<"/x)**(2./3.) - 1))"
+            << "with lines lt 1 lc 3 title 'energy-derived', "
+            << "'-' using 1:2 with points pt 7 title 'data'" << endl;
+    for (unsigned i = 0; i != volumes2.size(); ++i)
+      outfile << volumes2[i] <<  " " << pressures[i] << endl;
+    outfile << "e" << endl;
+  }
 
   return 0;
 }

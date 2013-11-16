@@ -58,11 +58,17 @@ double obj_func_birch_murnaghan_energy(const vector<double>& x,
 }
 
 BMParams mytest::bulk_modulus_energy(Compute& compute,
+                                     vector<double>& volumes,
+                                     vector<double>& energies,
+                                     double max_strain,
                                      bool c_to_a, bool b_to_a,
                                      bool positions,
                                      bool angle_ab,
                                      bool angle_ac,
                                      bool angle_bc) {
+  static const int n_boxes = 5; // Number of boxes in positive and
+                                // negative strain direction (i.e. the
+                                // real number of boxes is 2*n_boxes + 1).
   if (c_to_a || b_to_a)
     throw runtime_error("not implemented");
   if (positions)
@@ -70,8 +76,8 @@ BMParams mytest::bulk_modulus_energy(Compute& compute,
   if (angle_ab || angle_ac || angle_bc)
     throw runtime_error("not implemented");
   // Set up 11 boxes with different volumes.
-  const double epsilon = 0.01; // Total maximum strain is 5%.
-  vector<double> volumes;
+  const double epsilon = max_strain / n_boxes;
+  volumes.clear();
   vector<unique_ptr<Box>> boxes;
   for (int i = -5; i <= 5; ++i) {
     unique_ptr<Box> p = compute.copy_box();
@@ -80,7 +86,7 @@ BMParams mytest::bulk_modulus_energy(Compute& compute,
     boxes.push_back(move(p));
   }
   // Switch through boxes, recording energy.
-  vector<double> energies;
+  energies.clear();
   // Last entry of boxes now contains the original box.  As we always
   // calculate energy for the (i-1)th element and then put the ith
   // element into compute, we will end up with the original box in the
@@ -104,16 +110,91 @@ BMParams mytest::bulk_modulus_energy(Compute& compute,
   optimizer.set_ftol_abs(1e-6); // TODO: too much/too little?
   optimizer.optimize(parameters, obj_val);
 
-  /*
-  for (int i = 0; i != volumes.size(); ++i)
-    cout << volumes[i] << "   "
-         << energies[i] << "   "
-         << birch_murnaghan_energy(volumes[i],
-                                   parameters[0],
-                                   parameters[1],
-                                   parameters[2],
-                                   parameters[3]) << endl;
-  */
-
   return { parameters[0], parameters[1], parameters[2], parameters[3] };
+}
+
+
+static
+double birch_murnaghan_pressure(double V, double V0,
+                                double B0, double dB0_dp) {
+  const double V7_3 = pow(V0 / V, 7.0/3.0);
+  const double V5_3 = pow(V0 / V, 5.0/3.0);
+  const double V2_3 = pow(V0 / V, 2.0/3.0);
+  return 3*B0/2 * (V7_3 - V5_3) * (1 + 0.75 * (dB0_dp - 4) * (V2_3 - 1));
+}
+
+static
+double obj_func_birch_murnaghan_pressure(const vector<double>& x,
+                                         vector<double>& grad,
+                                         void* f_data) {
+  // Reference volumes and pressures.
+  auto& Vp = *static_cast<pair<vector<double>&,vector<double>&>*>(f_data);
+  // Gradient.
+  if (!grad.empty())
+    throw runtime_error("Gradient not supported.");
+  double obj_func = 0.0;
+  for(unsigned i = 0; i != Vp.first.size(); ++i) {
+    const double V = Vp.first[i];
+    const double ref_p = Vp.second[i];
+    obj_func += abs(ref_p - birch_murnaghan_pressure(V, x[0], x[1], x[2]));
+  }
+  return obj_func;
+}
+
+BMParams mytest::bulk_modulus_pressure(Compute& compute,
+                                       vector<double>& volumes,
+                                       vector<double>& pressures,
+                                       double max_strain,
+                                       bool c_to_a, bool b_to_a,
+                                       bool positions,
+                                       bool angle_ab,
+                                       bool angle_ac,
+                                       bool angle_bc) {
+  static const int n_boxes = 5; // Number of boxes in positive and
+                                // negative strain direction (i.e. the
+                                // real number of boxes is 2*n_boxes + 1).
+  if (c_to_a || b_to_a)
+    throw runtime_error("not implemented");
+  if (positions)
+    throw runtime_error("not implemented");
+  if (angle_ab || angle_ac || angle_bc)
+    throw runtime_error("not implemented");
+  // Set up 11 boxes with different volumes.
+  volumes.clear();
+  const double epsilon = max_strain / n_boxes;
+  vector<unique_ptr<Box>> boxes;
+  for (int i = -5; i <= 5; ++i) {
+    unique_ptr<Box> p = compute.copy_box();
+    p->scale(i*epsilon + 1);
+    volumes.push_back(p->calc_volume());
+    boxes.push_back(move(p));
+  }
+  // Switch through boxes, recording pressure.
+  pressures.clear();
+  // Last entry of boxes now contains the original box.  As we always
+  // calculate pressure for the (i-1)th element and then put the ith
+  // element into compute, we will end up with the original box in the
+  // Compute object without calculating pressure for it once.  The last
+  // element of boxes will be a null pointer after the loop.
+  boxes.push_back(compute.change_box(move(boxes[0])));
+  for (unsigned i = 1; i != boxes.size(); ++i) {
+    compute.compute();
+    // Assume hydrostatic, take average.
+    const Voigt6<double> press = compute.get_virial();
+    pressures.push_back(-(press.xx + press.yy + press.zz) / (3 * volumes[i-1]));
+    boxes[i-1] = compute.change_box(move(boxes[i]));
+  }
+
+  // Now fit Birch-Murnaghan.
+  double obj_val;
+  vector<double> parameters = { // Inital guess.
+    volumes[5], 1.0, 1.0
+  };
+  pair<vector<double>&,vector<double>&> refdata(volumes, pressures);
+  nlopt::opt optimizer(nlopt::LN_SBPLX, 3);
+  optimizer.set_min_objective(obj_func_birch_murnaghan_pressure, &refdata);
+  optimizer.set_ftol_abs(1e-6); // TODO: too much/too little?
+  optimizer.optimize(parameters, obj_val);
+
+  return { 0.0, parameters[0], parameters[1], parameters[2] };
 }
