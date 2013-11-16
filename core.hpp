@@ -500,6 +500,12 @@ namespace mytest {
   };
 
 
+  /** Parameters for the Birch-Murnaghan equation of state. */
+  struct BMParams {
+    double E0, V0, B0, dB0_dp;
+  };
+
+
   /** Main interface class.
 
       This class contains a simulation box and interacts with KIM.
@@ -774,6 +780,180 @@ namespace mytest {
     /** Return number of iterations in last optimization. */
     unsigned get_optimization_steps() const {
       return fit_counter;
+    }
+
+    /** Calculate bulk modulus using an energy-volume curve.
+
+        The bulk modulus is obtained by fitting the Birch-Murnaghan
+        equation of state to the energy-volume curve.
+
+        The simulation box should already be at equilibrium (positions
+        and box vectors).
+
+        Previous compute() results will be invalidated.
+
+        @param[out] volumes Will contain volume data points after the call.
+        @param[out] energies Will contain energy data points after the call.
+        @param max_strain The maximum strain put on the
+                          structure. Optional, default is 0.05 (5%).
+        @param c_to_a Optimize c/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      e.g. cubic structures and costs computing
+                      time). Optional, default @c false.
+        @param b_to_a Optimize b/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      many structures and costs computing
+                      time). Optional, default @c false.
+        @param positions Optimize atomic positions. Optional, default
+                         @c false.
+        @param angle_ab Optimize angle between a and b box
+                        vector. Optional, default @c false.
+        @param angle_ac Optimize angle between a and c box
+                        vector. Optional, default @c false.
+        @param angle_bc Optimize angle between b and c box
+                        vector. Optional, default @c false.
+        @return A Birch-Murnaghan result object.
+    */
+    BMParams bulk_modulus_energy(std::vector<double>& volumes,
+                                 std::vector<double>& energies,
+                                 double max_strain = 0.05,
+                                 bool c_to_a = false,
+                                 bool b_to_a = false,
+                                 bool positions = false,
+                                 bool angle_ab = false,
+                                 bool angle_ac = false,
+                                 bool angle_bc = false);
+
+    /** Calculate bulk modulus using an energy-volume curve.
+
+        The bulk modulus is obtained by fitting the Birch-Murnaghan
+        equation of state to the energy-volume curve.
+
+        The simulation box should already be at equilibrium (positions
+        and box vectors).
+
+        Previous compute() results will be invalidated.
+
+        @param max_strain The maximum strain put on the
+                          structure. Optional, default is 0.05 (5%).
+        @param c_to_a Optimize c/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      e.g. cubic structures and costs computing
+                      time). Optional, default @c false.
+        @param b_to_a Optimize b/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      many structures and costs computing
+                      time). Optional, default @c false.
+        @param positions Optimize atomic positions. Optional, default
+                         @c false.
+        @param angle_ab Optimize angle between a and b box
+                        vector. Optional, default @c false.
+        @param angle_ac Optimize angle between a and c box
+                        vector. Optional, default @c false.
+        @param angle_bc Optimize angle between b and c box
+                        vector. Optional, default @c false.
+        @return A Birch-Murnaghan result object.
+    */
+    BMParams bulk_modulus_energy(double max_strain = 0.05,
+                                 bool c_to_a = false,
+                                 bool b_to_a = false,
+                                 bool positions = false,
+                                 bool angle_ab = false,
+                                 bool angle_ac = false,
+                                 bool angle_bc = false) {
+      std::vector<double> volumes;
+      std::vector<double> energies;
+      return bulk_modulus_energy(volumes, energies, max_strain,
+                                 c_to_a, b_to_a, positions,
+                                 angle_ab, angle_ac, angle_bc);
+    }
+
+    /** Calculate bulk modulus using an pressure-volume curve.
+
+        The bulk modulus is obtained by fitting the Birch-Murnaghan
+        equation of state to the pressure-volume curve.
+
+        The simulation box should already be at equilibrium (positions
+        and box vectors).
+
+        Previous compute() results will be invalidated.
+
+        @param[out] volumes Will contain volume data points after the call.
+        @param[out] pressures Will contain pressure data points after the call.
+        @param max_strain The maximum strain put on the
+                          structure. Optional, default is 0.05 (5%).
+        @param c_to_a Optimize c/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      e.g. cubic structures and costs computing
+                      time). Optional, default @c false.
+        @param b_to_a Optimize b/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      many structures and costs computing
+                      time). Optional, default @c false.
+        @param positions Optimize atomic positions. Optional, default
+                         @c false.
+        @param angle_ab Optimize angle between a and b box
+                        vector. Optional, default @c false.
+        @param angle_ac Optimize angle between a and c box
+                        vector. Optional, default @c false.
+        @param angle_bc Optimize angle between b and c box
+                        vector. Optional, default @c false.
+        @return A Birch-Murnaghan result object.
+    */
+    BMParams bulk_modulus_pressure(std::vector<double>& volumes,
+                                   std::vector<double>& pressures,
+                                   double max_strain = 0.05,
+                                   bool c_to_a = false,
+                                   bool b_to_a = false,
+                                   bool positions = false,
+                                   bool angle_ab = false,
+                                   bool angle_ac = false,
+                                   bool angle_bc = false);
+
+    /** Calculate bulk modulus using an pressure-volume curve.
+
+        The bulk modulus is obtained by fitting the Birch-Murnaghan
+        equation of state to the pressure-volume curve.
+
+        The simulation box should already be at equilibrium (positions
+        and box vectors).
+
+        Previous compute() results will be invalidated.
+
+        @param[out] volumes Will contain volume data points after the call.
+        @param[out] pressures Will contain pressure data points after the call.
+        @param max_strain The maximum strain put on the
+                          structure. Optional, default is 0.05 (5%).
+        @param c_to_a Optimize c/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      e.g. cubic structures and costs computing
+                      time). Optional, default @c false.
+        @param b_to_a Optimize b/a ratio for the different volumes (this
+                      can be disabled because it is not important in
+                      many structures and costs computing
+                      time). Optional, default @c false.
+        @param positions Optimize atomic positions. Optional, default
+                         @c false.
+        @param angle_ab Optimize angle between a and b box
+                        vector. Optional, default @c false.
+        @param angle_ac Optimize angle between a and c box
+                        vector. Optional, default @c false.
+        @param angle_bc Optimize angle between b and c box
+                        vector. Optional, default @c false.
+        @return A Birch-Murnaghan result object.
+    */
+    BMParams bulk_modulus_pressure(double max_strain = 0.05,
+                                   bool c_to_a = false,
+                                   bool b_to_a = false,
+                                   bool positions = false,
+                                   bool angle_ab = false,
+                                   bool angle_ac = false,
+                                   bool angle_bc = false) {
+      std::vector<double> volumes;
+      std::vector<double> pressures;
+      return bulk_modulus_pressure(volumes, pressures, max_strain,
+                                   c_to_a, b_to_a, positions,
+                                   angle_ab, angle_ac, angle_bc);
     }
 
     /** Switch the contained Box objects between two Compute objects.

@@ -103,16 +103,16 @@ int main() {
   comp.move_atom(0, 0.1, 0.0, 0.0);
   vector<double> volumes1;
   vector<double> energies;
-  const BMParams bmp = bulk_modulus_energy(comp, volumes1, energies, 0.05,
-                                           false, false, true);
+  const BMParams bmp = comp.bulk_modulus_energy(volumes1, energies, 0.05,
+                                                false, false, true);
   cout << "E0  = " << bmp.E0 / comp.get_natoms() << " eV/atom\n"
        << "V0  = " << bmp.V0 / comp.get_natoms() << " A^3/atom\n"
        << "B0  = " << bmp.B0 * 160.2177 << " GPa\n"
        << "B0' = " << bmp.dB0_dp << endl;
   vector<double> volumes2;
   vector<double> pressures;
-  const BMParams bmpp = bulk_modulus_pressure(comp, volumes2, pressures, 0.05,
-                                              false, false, true);
+  const BMParams bmpp = comp.bulk_modulus_pressure(volumes2, pressures, 0.05,
+                                                   false, false, true);
   cout << "V0  = " << bmpp.V0 / comp.get_natoms() << " A^3/atom\n"
        << "B0  = " << bmpp.B0 * 160.2177 << " GPa\n"
        << "B0' = " << bmpp.dB0_dp << endl;
