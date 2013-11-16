@@ -71,8 +71,6 @@ BMParams mytest::bulk_modulus_energy(Compute& compute,
                                 // real number of boxes is 2*n_boxes + 1).
   if (c_to_a || b_to_a)
     throw runtime_error("not implemented");
-  if (positions)
-    throw runtime_error("not implemented");
   if (angle_ab || angle_ac || angle_bc)
     throw runtime_error("not implemented");
   // Set up 11 boxes with different volumes.
@@ -94,6 +92,8 @@ BMParams mytest::bulk_modulus_energy(Compute& compute,
   // element of boxes will be a null pointer after the loop.
   boxes.push_back(compute.change_box(move(boxes[0])));
   for (unsigned i = 1; i != boxes.size(); ++i) {
+    if (positions)
+      compute.optimize_positions(0.001, 10000);
     compute.compute();
     energies.push_back(compute.get_energy());
     boxes[i-1] = compute.change_box(move(boxes[i]));
@@ -155,8 +155,6 @@ BMParams mytest::bulk_modulus_pressure(Compute& compute,
                                 // real number of boxes is 2*n_boxes + 1).
   if (c_to_a || b_to_a)
     throw runtime_error("not implemented");
-  if (positions)
-    throw runtime_error("not implemented");
   if (angle_ab || angle_ac || angle_bc)
     throw runtime_error("not implemented");
   // Set up 11 boxes with different volumes.
@@ -178,6 +176,8 @@ BMParams mytest::bulk_modulus_pressure(Compute& compute,
   // element of boxes will be a null pointer after the loop.
   boxes.push_back(compute.change_box(move(boxes[0])));
   for (unsigned i = 1; i != boxes.size(); ++i) {
+    if (positions)
+      compute.optimize_positions(0.001, 10000);
     compute.compute();
     // Assume hydrostatic, take average.
     const Voigt6<double> press = compute.get_virial();

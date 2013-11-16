@@ -100,17 +100,19 @@ int main() {
                "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
   comp.compute();
   cout << comp.get_energy_per_atom() << " eV/atom" << endl;
-  //comp.move_atom(0, 0.1, 0.0, 0.0);
+  comp.move_atom(0, 0.1, 0.0, 0.0);
   vector<double> volumes1;
   vector<double> energies;
-  const BMParams bmp = bulk_modulus_energy(comp, volumes1, energies);
+  const BMParams bmp = bulk_modulus_energy(comp, volumes1, energies, 0.05,
+                                           false, false, true);
   cout << "E0  = " << bmp.E0 / comp.get_natoms() << " eV/atom\n"
        << "V0  = " << bmp.V0 / comp.get_natoms() << " A^3/atom\n"
        << "B0  = " << bmp.B0 * 160.2177 << " GPa\n"
        << "B0' = " << bmp.dB0_dp << endl;
   vector<double> volumes2;
   vector<double> pressures;
-  const BMParams bmpp = bulk_modulus_pressure(comp, volumes2, pressures);
+  const BMParams bmpp = bulk_modulus_pressure(comp, volumes2, pressures, 0.05,
+                                              false, false, true);
   cout << "V0  = " << bmpp.V0 / comp.get_natoms() << " A^3/atom\n"
        << "B0  = " << bmpp.B0 * 160.2177 << " GPa\n"
        << "B0' = " << bmpp.dB0_dp << endl;
