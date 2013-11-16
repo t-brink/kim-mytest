@@ -158,5 +158,21 @@ int main() {
     outfile << "e" << endl;
   }
 
+  // Get elastic constants of silicon.
+  Compute compSi(make_unique<Box>("diamond", 5.429, false, 1, 1, 1,
+                                  true, true, true,
+                                  typesSi, KIM_neigh_rvec_f, "boxxx"),
+                 "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
+  comp.optimize_box(0.001, 10000);
+  const double c11_0 = compSi.elastic_constant(1,1, 0.025, false);
+  const double c11 = compSi.elastic_constant(1,1, 0.025, true);
+  cout << "c11 = " << c11 * 160.2177 << "  " << c11_0 * 160.2177 << " GPa" << endl;
+  const double c12_0 = compSi.elastic_constant(1,2, 0.025, false);
+  const double c12 = compSi.elastic_constant(1,2, 0.025, true);
+  cout << "c12 = " << c12 * 160.2177 << "  " << c12_0 * 160.2177 << " GPa" << endl;
+  const double c44_0 = compSi.elastic_constant(4,4, 0.025, false);
+  const double c44 = compSi.elastic_constant(4,4, 0.025, true);
+  cout << "c44 = " << c44 * 160.2177 << "  " << c44_0 * 160.2177 << " GPa" << endl;
+
   return 0;
 }

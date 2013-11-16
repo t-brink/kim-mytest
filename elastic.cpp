@@ -22,6 +22,7 @@
 */
 
 #include "elastic.hpp"
+#include "utils.hpp"
 
 #include <nlopt.hpp>
 
@@ -194,4 +195,60 @@ BMParams Compute::bulk_modulus_pressure(vector<double>& volumes,
   optimizer.optimize(parameters, obj_val);
 
   return { 0.0, parameters[0], parameters[1], parameters[2] };
+}
+
+double Compute::elastic_constant(unsigned i, unsigned j,
+                                 vector<double>& strain,
+                                 vector<double>& stress,
+                                 double max_strain,
+                                 bool positions) {
+  static const int n_boxes = 5; // Number of boxes in positive and
+                                // negative strain direction (i.e. the
+                                // real number of boxes is 2*n_boxes + 1).
+  if (i < 1 || i > 6)
+    throw runtime_error("i must be in [1..6]");
+  if (j < 1 || j > 6)
+    throw runtime_error("j must be in [1..6]");
+  const unsigned ii = i - 1;
+  const unsigned jj = j - 1;
+  // Set up 11 boxes with different strains.
+  strain.clear();
+  vector<double> volumes;
+  const double epsilon = max_strain / n_boxes;
+  vector<unique_ptr<Box>> boxes;
+  for (int i = -5; i <= 5; ++i) {
+    unique_ptr<Box> p = copy_box();
+    const double eps = i*epsilon;
+    Voigt6<double> defmatrix(1.0, 1.0, 1.0, 0.0, 0.0, 0.0);
+    defmatrix(ii) += eps;
+    p->deform(defmatrix);
+    strain.push_back(eps);
+    volumes.push_back(p->calc_volume());
+    boxes.push_back(move(p));
+  }
+  // Switch through boxes, recording stress.
+  stress.clear();
+  // Last entry of boxes now contains the original box.  As we always
+  // calculate pressure for the (i-1)th element and then put the ith
+  // element into compute, we will end up with the original box in the
+  // Compute object without calculating pressure for it once.  The last
+  // element of boxes will be a null pointer after the loop.
+  boxes.push_back(change_box(move(boxes[0])));
+  for (unsigned i = 1; i != boxes.size(); ++i) {
+    if (positions)
+      optimize_positions(0.001, 10000);
+    compute();
+    const Voigt6<double> press = get_virial();
+    stress.push_back(press(jj) / volumes[i-1]);
+    boxes[i-1] = change_box(move(boxes[i]));
+  }
+
+  // Now fit Hooke.
+  auto res = linear_leastsq(strain, stress);
+  const double eps0 = res.first;
+  const double c = (j <= 3) ? res.second : res.second/2;
+  if (abs(eps0) > 0.01)
+    cout << "WARNING: stress at strain = 0 is not zero, "
+         << "box may not be well optimized." << endl;
+  return c;
 }

@@ -956,6 +956,72 @@ namespace mytest {
                                    angle_ab, angle_ac, angle_bc);
     }
 
+    /** Calculate elastic constant c_ij.
+
+        The constant is obtained by fitting to σ_i = c_ij·ε_j.  To
+        make this work, the simulation box should already be at
+        equilibrium (positions and box vectors).
+
+        This method uses a Voigt notation where
+        1 -> xx
+        2 -> yy
+        3 -> zz
+        4 -> yz
+        5 -> xz
+        6 -> xy,
+        which is the same as KIM.
+
+        Previous compute() results will be invalidated.
+
+        @param i First index, must be in [1..6].
+        @param j Second index, must be in [1..6].
+        @param[out] strain Will contain strain data points after the call.
+        @param[out] stress Will contain stress data points after the call.
+        @param max_strain The maximum strain put on the
+                          structure. Optional, default is 0.025 (2.5%).
+        @param positions Optimize atomic positions. For some
+                         deformation modes this is
+                         essential. Optional, default @c false.
+    */
+    double elastic_constant(unsigned i, unsigned j,
+                            std::vector<double>& strain,
+                            std::vector<double>& stress,
+                            double max_strain = 0.025,
+                            bool positions = false);
+
+    /** Calculate elastic constant c_ij.
+
+        The constant is obtained by fitting to σ_i = c_ij·ε_j.  To
+        make this work, the simulation box should already be at
+        equilibrium (positions and box vectors).
+
+        This method uses a Voigt notation where
+        1 -> xx
+        2 -> yy
+        3 -> zz
+        4 -> yz
+        5 -> xz
+        6 -> xy,
+        which is the same as KIM.
+
+        Previous compute() results will be invalidated.
+
+        @param i First index, must be in [1..6].
+        @param j Second index, must be in [1..6].
+        @param max_strain The maximum strain put on the
+                          structure. Optional, default is 0.025 (2.5%).
+        @param positions Optimize atomic positions. For some
+                         deformation modes this is
+                         essential. Optional, default @c false.
+    */
+    double elastic_constant(unsigned i, unsigned j,
+                            double max_strain = 0.025,
+                            bool positions = false) {
+      std::vector<double> strain;
+      std::vector<double> stress;
+      return elastic_constant(i, j, strain, stress, max_strain, positions);
+    }
+
     /** Switch the contained Box objects between two Compute objects.
 
         Both boxes must have the same KIM neighbor list type and use
