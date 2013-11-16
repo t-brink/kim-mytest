@@ -174,5 +174,45 @@ int main() {
   const double c44 = compSi.elastic_constant(4,4, 0.025, true);
   cout << "c44 = " << c44 * 160.2177 << "  " << c44_0 * 160.2177 << " GPa" << endl;
 
+  // Let's check another model.
+  const vector<int> typesAr = { 1 };
+  Compute compAr(make_unique<Box>("fcc", 5.2, true, 1, 1, 1,
+                                  true, true, true,
+                                  typesAr, KIM_neigh_rvec_f, "box Ar"),
+                 "ex_model_Ar_P_MLJ_NEIGH_RVEC_F");
+  compAr.compute();
+  cout << compAr.get_energy_per_atom() << endl;
+  Voigt6<double> virial = compAr.get_virial();
+  cout << virial.xx << "  "
+       << virial.yy << "  "
+       << virial.zz << "  "
+       << virial.xy << "  "
+       << virial.xz << "  "
+       << virial.yz << endl;
+  compAr.optimize_box(0.001, 100000, true);
+  cout << "Lattice const "
+       << compAr.get_a()[0] << "   "
+       << compAr.get_b()[1] << "   "
+       << compAr.get_c()[2] << endl;
+  compAr.compute();
+  cout << compAr.get_energy_per_atom() << endl;
+  Voigt6<double> virial2 = compAr.get_virial();
+  cout << virial2.xx << "  "
+       << virial2.yy << "  "
+       << virial2.zz << "  "
+       << virial2.xy << "  "
+       << virial2.xz << "  "
+       << virial2.yz << endl;
+  cout << "c11 = " << compAr.elastic_constant(1,1,0.005,true) * 160.2177 << endl;
+  cout << "c22 = " << compAr.elastic_constant(2,2,0.005,true) * 160.2177 << endl;
+  cout << "c33 = " << compAr.elastic_constant(3,3,0.005,true) * 160.2177 << endl;
+  cout << "c44 = " << compAr.elastic_constant(4,4,0.005,true) * 160.2177 << endl;
+  cout << "c55 = " << compAr.elastic_constant(5,5,0.005,true) * 160.2177 << endl;
+  cout << "c66 = " << compAr.elastic_constant(6,6,0.005,true) * 160.2177 << endl;
+  cout << "c12 = " << compAr.elastic_constant(1,2,0.005,true) * 160.2177 << endl;
+  cout << "c13 = " << compAr.elastic_constant(1,3,0.005,true) * 160.2177 << endl;
+  cout << "c14 = " << compAr.elastic_constant(1,4,0.005,true) * 160.2177 << endl;
+  cout << "c15 = " << compAr.elastic_constant(1,5,0.005,true) * 160.2177 << endl;
+  cout << "c16 = " << compAr.elastic_constant(1,6,0.005,true) * 160.2177 << endl;
   return 0;
 }

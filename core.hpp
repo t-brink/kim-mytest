@@ -691,7 +691,17 @@ namespace mytest {
         box_->update_ghost_rvecs();
     }
 
-    /** Compute values using KIM. */
+    /** Compute values using KIM.
+
+        Output values that are not supported by the model are simply
+        zero.
+
+        Due to the way periodic boundaries are implemented in CLUSTER
+        mode (namely using ghost atoms), we need particleEnergy to
+        actually calculate energy and particleVirial to actually
+        calculate virial. If a model doesn't provide those energy and
+        virial are simply set to zero in that case.
+    */
     void compute();
 
     /** Get the computed potential energy of the box. */
@@ -1056,6 +1066,16 @@ namespace mytest {
     const std::string modelname_;
     KIM_API_model* model;
     KIMNeigh neighbor_mode;
+    // Inputs and outputs supported by the model.
+    bool has_get_neigh;
+    bool has_neighObject;
+    bool has_boxSideLengths;
+    bool has_reinit;
+    bool has_energy;
+    bool has_forces;
+    bool has_particleEnergy;
+    bool has_virial;
+    bool has_particleVirial;
     // Model input.
     int ntypes;
     // Model output (constant).

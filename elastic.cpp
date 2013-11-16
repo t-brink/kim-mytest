@@ -74,6 +74,11 @@ BMParams Compute::bulk_modulus_energy(vector<double>& volumes,
                                       bool angle_ab,
                                       bool angle_ac,
                                       bool angle_bc) {
+  // Check if energy calculation is supported.
+  if (!has_energy)
+    throw runtime_error("The model does not provide energy calculation "
+                        "which is needed to calculate bulk modulus.");
+  //
   static const int n_boxes = 5; // Number of boxes in positive and
                                 // negative strain direction (i.e. the
                                 // real number of boxes is 2*n_boxes + 1).
@@ -148,6 +153,11 @@ BMParams Compute::bulk_modulus_pressure(vector<double>& volumes,
                                         bool angle_ab,
                                         bool angle_ac,
                                         bool angle_bc) {
+  // Check if virial calculation is supported.
+  if (!has_virial)
+    throw runtime_error("The model does not provide virial calculation "
+                        "which is needed to calculate bulk modulus.");
+  //
   static const int n_boxes = 5; // Number of boxes in positive and
                                 // negative strain direction (i.e. the
                                 // real number of boxes is 2*n_boxes + 1).
@@ -202,6 +212,11 @@ double Compute::elastic_constant(unsigned i, unsigned j,
                                  vector<double>& stress,
                                  double max_strain,
                                  bool positions) {
+  // Check if virial calculation is supported.
+  if (!has_virial)
+    throw runtime_error("The model does not provide virial calculation "
+                        "which is needed to calculate elastic constants.");
+  //
   static const int n_boxes = 5; // Number of boxes in positive and
                                 // negative strain direction (i.e. the
                                 // real number of boxes is 2*n_boxes + 1).
@@ -248,7 +263,7 @@ double Compute::elastic_constant(unsigned i, unsigned j,
   const double eps0 = res.first;
   const double c = (j <= 3) ? res.second : res.second/2;
   if (abs(eps0) > 0.01)
-    cout << "WARNING: stress at strain = 0 is not zero, "
+    cerr << "WARNING: stress at strain = 0 is not zero, "
          << "box may not be well optimized." << endl;
   return c;
 }

@@ -716,40 +716,6 @@ Vec3D<unsigned> Box::calc_number_of_ghost_shells(double cutoff) const {
 
 
 
-// Template for the test KIM descriptor file ///////////////////////////
-
-/* Atom types and neighbor list modes will be added dynamically. */
-static const string KIM_DESC =
-  "Unit_length      := A\n"
-  "Unit_energy      := eV\n"
-  "Unit_charge      := e\n"
-  "Unit_temperature := K\n"
-  "Unit_time        := ps\n"
-  "\n"
-  "ZeroBasedLists    flag\n"
-  "\n"
-  "# Model input\n"
-  "numberOfParticles    integer   none      []\n"
-  "numberParticleTypes  integer   none      []\n"
-  "particleTypes        integer   none      [numberOfParticles]\n"
-  "coordinates          double    length    [numberOfParticles,3]\n"
-  "get_neigh            method    none      []\n"
-  "neighObject          pointer   none      []\n"
-  "boxSideLengths       double    length    [3]\n"
-  "\n"
-  "# Model output\n"
-  "destroy              method    none      []\n"
-  "compute              method    none      []\n"
-  "reinit               method    none      []\n"
-  "cutoff               double    length    []\n"
-  "energy               double    energy    []\n"
-  "forces               double    force     [numberOfParticles,3]\n"
-  "particleEnergy       double    energy    [numberOfParticles]\n"
-  "virial               double    energy    [6]\n"
-  "particleVirial       double    energy    [numberOfParticles,6]\n"
-  ;
-
-
 // Compute /////////////////////////////////////////////////////////////
 
 
@@ -760,8 +726,15 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   int status;
 
   // Assemble KIM descriptor file.
-  string descriptor = KIM_DESC;
-  descriptor += "Neigh_LocaAccess  flag\n";
+  string descriptor =
+    "Unit_length      := A\n"
+    "Unit_energy      := eV\n"
+    "Unit_charge      := e\n"
+    "Unit_temperature := K\n"
+    "Unit_time        := ps\n"
+    "\n"
+    "ZeroBasedLists    flag\n"
+    "Neigh_BothAccess  flag\n";
   switch (neighbor_mode) {
   case KIM_cluster:
     descriptor += "CLUSTER           flag\n";
@@ -786,6 +759,9 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   // Query and store particle type codes.  For this we first get a
   // dummy model instance that can be queried for all the information
   // in the KIM descriptor.  Also add species to the test descriptor.
+  descriptor +=
+    "\n"
+    "# Supported atom types\n";
   KIM_API_model* query;
   status = KIM_API_model_info(&query, modelname.c_str());
   if (status < KIM_STATUS_OK)
@@ -807,6 +783,59 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
     descriptor += t + " spec " + to_string(code) + "\n";
   }
   free(pt);
+
+  // Get supported inputs/outputs/computes.
+  query->get_index("get_neigh", &status);
+  has_get_neigh = (status == KIM_STATUS_OK);
+  query->get_index("neighObject", &status);
+  has_neighObject = (status == KIM_STATUS_OK);
+  query->get_index("boxSideLengths", &status);
+  has_boxSideLengths = (status == KIM_STATUS_OK);
+  query->get_index("reinit", &status);
+  has_reinit = (status == KIM_STATUS_OK);
+  query->get_index("energy", &status);
+  has_energy = (status == KIM_STATUS_OK);
+  query->get_index("forces", &status);
+  has_forces = (status == KIM_STATUS_OK);
+  query->get_index("particleEnergy", &status);
+  has_particleEnergy = (status == KIM_STATUS_OK);
+  query->get_index("virial", &status);
+  has_virial = (status == KIM_STATUS_OK);
+  query->get_index("particleVirial", &status);
+  has_particleVirial = (status == KIM_STATUS_OK);
+
+  descriptor +=
+    "\n"
+    "# Model input\n"
+    "numberOfParticles    integer   none      []\n"
+    "numberParticleTypes  integer   none      []\n"
+    "particleTypes        integer   none      [numberOfParticles]\n"
+    "coordinates          double    length    [numberOfParticles,3]\n";
+  if (has_get_neigh)
+    descriptor += "get_neigh            method    none      []\n";
+  if (has_neighObject)
+    descriptor += "neighObject          pointer   none      []\n";
+  if (has_boxSideLengths)
+    descriptor += "boxSideLengths       double    length    [3]\n";
+  descriptor +=
+    "\n"
+    "# Model output\n"
+    "destroy              method    none      []\n"
+    "compute              method    none      []\n"
+    "cutoff               double    length    []\n";
+  if (has_reinit)
+    descriptor += "reinit               method    none      []\n";
+  if (has_energy)
+    descriptor += "energy               double    energy    []\n";
+  if (has_forces)
+    descriptor += "forces               double    force     [numberOfParticles,3]\n";
+  if (has_particleEnergy)
+    descriptor += "particleEnergy       double    energy    [numberOfParticles]\n";
+  if (has_virial)
+    descriptor += "virial               double    energy    [6]\n";
+  if (has_particleVirial)
+    descriptor += "particleVirial       double    energy    [numberOfParticles,6]\n";
+
   // Destroy the dummy model again.
   KIM_API_free(&query, &status);
   if (status < KIM_STATUS_OK)
@@ -832,23 +861,25 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   // which outputs the cutoff.  So we have to make do with these for
   // now.
   model->setm_data(&status, 7*4,
-                   "numberOfParticles",   1, &box_->nall,                1,
-                   "numberParticleTypes", 1, &ntypes,                    1,
-                   "neighObject",         1, this,                       1,
-                   "boxSideLengths",      3, &box_->box_side_lengths[0], 1,
-                   "cutoff",              1, &cutoff,                    1,
-                   "energy",              1, &energy,                    1,
-                   "virial",              6, &virial(0),                 1
-                   );
+       "numberOfParticles",   1, &box_->nall,                1,
+       "numberParticleTypes", 1, &ntypes,                    1,
+       "neighObject",         1, this,                       int(has_neighObject),
+       "boxSideLengths",      3, &box_->box_side_lengths[0], int(has_boxSideLengths),
+       "cutoff",              1, &cutoff,                    1,
+       "energy",              1, &energy,                    int(has_energy),
+       "virial",              6, &virial(0),                 int(has_virial)
+       );
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
 
   // Pass methods to KIM.
-  status = model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
+  if (has_get_neigh) {
+    status = model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+  }
 
   // Init KIM model.
   status = model->model_init();
@@ -925,15 +956,18 @@ void Compute::compute() {
       energy = 0.0;
       virial(0) = 0.0; virial(1) = 0.0; virial(2) = 0.0;
       virial(3) = 0.0; virial(4) = 0.0; virial(5) = 0.0;
-      for (unsigned i = 0; i != box_->natoms; ++i) {
-        energy += particleEnergy[i];
-        virial(0) += particleVirial[i*6 + 0];
-        virial(1) += particleVirial[i*6 + 1];
-        virial(2) += particleVirial[i*6 + 2];
-        virial(3) += particleVirial[i*6 + 3];
-        virial(4) += particleVirial[i*6 + 4];
-        virial(5) += particleVirial[i*6 + 5];
-      }
+      if (has_particleEnergy)
+        for (unsigned i = 0; i != box_->natoms; ++i)
+          energy += particleEnergy[i];
+      if (has_particleVirial)
+        for (unsigned i = 0; i != box_->natoms; ++i) {
+          virial(0) += particleVirial[i*6 + 0];
+          virial(1) += particleVirial[i*6 + 1];
+          virial(2) += particleVirial[i*6 + 2];
+          virial(3) += particleVirial[i*6 + 3];
+          virial(4) += particleVirial[i*6 + 4];
+          virial(5) += particleVirial[i*6 + 5];
+        }
       break;
     case KIM_mi_opbc_f:
     case KIM_neigh_rvec_f:
@@ -958,19 +992,6 @@ void Compute::compute() {
     default:
       throw runtime_error("unsupported neighbor mode.");
   }
-
-  /*
-  cout << "                                                                 "
-       << "               "
-       << forces[0] << " " << forces[1] << " " << forces[2]
-       << "  ::  "
-       << particleVirial[0] << " " << particleVirial[1] << " "
-       << particleVirial[2] << " " << particleVirial[3] << " "
-       << particleVirial[4] << " " << particleVirial[5] << " "
-       << "  ::  "
-       << particleEnergy[0]
-       << endl;
-  */
 }
 
 
@@ -1031,16 +1052,16 @@ void Compute::update_neighbor_list() {
   const bool arrays_changed = box_->update_neighbor_list(cutoff, 0.0);
   if (arrays_changed) {
     const unsigned n = box_->nall;
-    forces.resize(3 * n);
-    particleEnergy.resize(n);
-    particleVirial.resize(6 * n);
+    if (has_forces) forces.resize(3 * n);
+    if (has_particleEnergy) particleEnergy.resize(n);
+    if (has_particleVirial) particleVirial.resize(6 * n);
     model->setm_data(&status, 5*4, // TODO: use indices!
-                     "coordinates",    3*n, box_->get_positions_ptr(), 1,
-                     "particleTypes",    n, box_->get_types_ptr(),     1,
-                     "forces",         3*n, &forces[0],                1,
-                     "particleEnergy",   n, &particleEnergy[0],        1,
-                     "particleVirial", 6*n, &particleVirial[0],        1
-                     );
+        "coordinates",    3*n, box_->get_positions_ptr(), 1,
+        "particleTypes",    n, box_->get_types_ptr(),     1,
+        "forces",         3*n, &forces[0],                int(has_forces),
+        "particleEnergy",   n, &particleEnergy[0],        int(has_particleEnergy),
+        "particleVirial", 6*n, &particleVirial[0],        int(has_particleVirial)
+        );
     if (status < KIM_STATUS_OK)
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
@@ -1051,6 +1072,9 @@ template<typename T>
 void Compute::set_parameter_impl(const string& param_name,
                                  const vector<unsigned>& indices,
                                  T value, bool reinit) {
+  // Check if the model supports reinit.
+  if (!has_reinit)
+    throw runtime_error("model does not support changing parameters.");
   // Get parameter data.
   const auto it = free_parameter_map.find(param_name);
   if (it == free_parameter_map.end())
@@ -1127,6 +1151,12 @@ double Compute::obj_func_box(const vector<double>& x, vector<double>& grad,
 
 double Compute::optimize_box(double ftol_abs, unsigned maxeval,
                              bool isotropic) {
+  // Check if optimizing box is supported. Box optimization needs
+  // energy, so check if that is provided.
+  if (!has_energy)
+    throw runtime_error("The model does not provide energy calculation "
+                        "which is needed to optimize the box.");
+  //
   vector<double> lengths;
   lengths.push_back(box_->box_side_lengths[0]);
   if (!isotropic) {
@@ -1174,6 +1204,11 @@ double Compute::obj_func_pos(const vector<double>& x, vector<double>& grad,
 }
 
 double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
+  // Check if optimizing box is supported. Box optimization needs
+  // energy, so check if that is provided.
+  if (!has_energy)
+    throw runtime_error("The model does not provide energy calculation "
+                        "which is needed to optimize atom positions.");
   // Get coordinates as vector.
   Array2D<double>& pos = box_->positions;
   const int nparams = pos.extent(0)*pos.extent(1);
@@ -1183,8 +1218,18 @@ double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
   //   * NLOPT_LD_LBFGS
   //   * NLOPT_LD_TNEWTON_PRECOND_RESTART
   //   * NLOPT_LD_VAR2
+  nlopt::algorithm algo;
+  if (has_forces)
+    // We can use an algorithm with gradients.
+    algo = nlopt::LD_TNEWTON_PRECOND_RESTART;
+  else {
+    // We must use a gradient-free algorithm.
+    cerr << "WARNING: model does not compute forces, "
+         << "atomic position optimization will be slow." << endl;
+    algo = nlopt::LN_SBPLX;
+  }
   double obj_val;
-  nlopt::opt optimizer(nlopt::LD_TNEWTON_PRECOND_RESTART, nparams);
+  nlopt::opt optimizer(algo, nparams);
   optimizer.set_min_objective(Compute::obj_func_pos, this);
   fit_counter = 0;
   optimizer.set_maxeval(maxeval);
@@ -1224,14 +1269,14 @@ void Compute::update_kim_after_box_change() {
   particleEnergy.resize(n);
   particleVirial.resize(6 * n);
   model->setm_data(&status, 7*4, // TODO: use indices!
-                   "numberOfParticles",   1, &box_->nall,                1,
-                   "boxSideLengths",      3, &box_->box_side_lengths[0], 1,
-                   "coordinates",       3*n, box_->get_positions_ptr(),  1,
-                   "particleTypes",       n, box_->get_types_ptr(),      1,
-                   "forces",            3*n, &forces[0],                 1,
-                   "particleEnergy",      n, &particleEnergy[0],         1,
-                   "particleVirial",    6*n, &particleVirial[0],         1
-                   );
+      "numberOfParticles",   1, &box_->nall,                1,
+      "boxSideLengths",      3, &box_->box_side_lengths[0], int(has_boxSideLengths),
+      "coordinates",       3*n, box_->get_positions_ptr(),  1,
+      "particleTypes",       n, box_->get_types_ptr(),      1,
+      "forces",            3*n, &forces[0],                 int(has_forces),
+      "particleEnergy",      n, &particleEnergy[0],         int(has_particleEnergy),
+      "particleVirial",    6*n, &particleVirial[0],         int(has_particleVirial)
+      );
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
