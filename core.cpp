@@ -8,7 +8,7 @@
 #include <KIM_API_status.h>
 #include <nlopt.hpp>
 
-#include "mytestcore.hpp"
+#include "core.hpp"
 
 using namespace std;
 using namespace mytest;

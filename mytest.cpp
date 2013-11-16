@@ -25,7 +25,7 @@
 #include <cstdio>
 
 #include "utils.hpp"
-#include "mytestcore.hpp"
+#include "core.hpp"
 #include "elastic.hpp"
 
 using namespace std;

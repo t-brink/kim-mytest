@@ -24,7 +24,7 @@
 #ifndef ELASTIC_HPP
 #define ELASTIC_HPP
 
-#include "mytestcore.hpp"
+#include "core.hpp"
 
 namespace mytest {
 
