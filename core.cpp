@@ -292,10 +292,12 @@ Box::Box(const Box& other)
     natoms_(other.natoms_), nghosts_(other.nghosts_), nall_(other.nall_),
     name_(other.name_),
     ghost_shells(other.ghost_shells),
+    /*
     ghost_positions(make_unique<Array2D<double>>(
                                     other.ghost_positions->extent(0),
                                     other.ghost_positions->extent(1))),
     ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
+    */
     neigh_list_(other.neigh_list_),
     neigh_rvec_(other.neigh_rvec_),
     neigh_rvec_shell_(other.neigh_rvec_shell_)
@@ -305,11 +307,16 @@ Box::Box(const Box& other)
       positions(i,j) = other.positions(i,j);
   for (int i = 0; i != types.extent(0); ++i)
     types(i) = other.types(i);
-  for (int i = 0; i != ghost_positions->extent(0); ++i)
-    for (int j = 0; j != ghost_positions->extent(1); ++j)
-      (*ghost_positions)(i,j) = (*other.ghost_positions)(i,j);
-  for (int i = 0; i != ghost_types->extent(0); ++i)
-    (*ghost_types)(i) = (*other.ghost_types)(i);
+  if (other.ghost_positions && other.ghost_types) {
+    ghost_positions = make_unique<Array2D<double>>(other.ghost_positions->extent(0),
+                                                   other.ghost_positions->extent(1));
+    ghost_types = make_unique<Array1D<int>>(other.ghost_types->extent(0));
+    for (int i = 0; i != ghost_positions->extent(0); ++i)
+      for (int j = 0; j != ghost_positions->extent(1); ++j)
+        (*ghost_positions)(i,j) = (*other.ghost_positions)(i,j);
+    for (int i = 0; i != ghost_types->extent(0); ++i)
+      (*ghost_types)(i) = (*other.ghost_types)(i);
+  }
 }
 
 
