@@ -27,11 +27,19 @@
 #include "utils.hpp"
 #include "core.hpp"
 #include "elastic.hpp"
+#include "dsl.hpp"
 
 using namespace std;
 using namespace mytest;
 
 int main() {
+  map< string,unique_ptr<Box> > boxes;
+  map<string,Compute> computes;
+  string input;
+  while (getline(cin, input))
+    parse(input, boxes, computes);
+  return 0;
+
   const vector<int> types1{ 0 };
   Compute comp1(make_unique<Box>("fcc", 3.940, true, 3, 3, 3,
                                  true, true, true,
