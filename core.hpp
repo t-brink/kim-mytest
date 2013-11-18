@@ -85,7 +85,7 @@ namespace mytest {
     Box(const Vec3D<double>& a, const Vec3D<double>& b, const Vec3D<double>& c,
         bool periodic_a, bool periodic_b, bool periodic_c,
         std::unique_ptr< Array2D<double> > coordinates,
-        std::unique_ptr< Array1D<int> > types,
+        std::unique_ptr< Array1DInit<std::string> > types,
         KIMNeigh neighmode, const std::string& name);
 
     /** Lattice constructor.
@@ -121,7 +121,7 @@ namespace mytest {
     Box(const std::string& lattice, double lattice_const, bool cubic,
         unsigned repeat_a, unsigned repeat_b, unsigned repeat_c,
         bool periodic_a, bool periodic_b, bool periodic_c,
-        const std::vector<int>& types,
+        const std::vector<std::string>& types,
         KIMNeigh neighmode, const std::string& name);
 
     /** Copy constructor. */
@@ -134,15 +134,20 @@ namespace mytest {
         This will allocate memory for ghost atoms if needed and
         includes a call to update_ghosts().
 
+        @todo should wrap atoms outside the box back into it!
+
         @param cutoff The cutoff.
         @param skin Fraction of cutoff that should be added to the
                     cutoff to avoid re-calculating the neighbor list
                     when atoms move small distances.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
         @return If the return value is true, then any previous
                 pointers to ghost atom memory are invalid (that means
                 re-setting KIM data for positions and types at least).
     */
-    bool update_neighbor_list(double cutoff, double skin);
+    bool update_neighbor_list(double cutoff, double skin,
+                              const std::map<std::string,int>& typemap);
 
     /** Update ghost atom positions from central atom positions.
 
@@ -152,8 +157,11 @@ namespace mytest {
 
         Call after manipulating atomic positions even if ghost atoms
         are disabled.
+
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
     */
-    void update_ghosts();
+    void update_ghosts(const std::map<std::string,int>& typemap);
 
     /** Update distance vectors.
 
@@ -162,8 +170,11 @@ namespace mytest {
 
         Calling this method is cheaper than re-calcuting the neighbor
         list with update_neighbor_list().
+
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
     */
-    void update_ghost_rvecs();
+    void update_ghost_rvecs(const std::map<std::string,int>& typemap);
 
     // Public data /////////////////////////////////////////////////////
 
@@ -239,11 +250,13 @@ namespace mytest {
 
     /** Atom types.
 
+        Contains atom types as strings.
+
         Users are free to manipulate the data in this array.  Changes
         will not be applied until calling update_ghosts().  Changing
         the size produces undefined results!
     */
-    Array1D<int> types;
+    Array1DInit<std::string> types;
 
     // Calculate/return values /////////////////////////////////////////
 
@@ -336,9 +349,12 @@ namespace mytest {
       return &(*ghost_positions)(0,0);
     }
 
-    /** Return const pointer to types (including ghosts).
+    /** Return const pointer to type codes (including ghosts).
 
-        Same arguments as for get_positions() vs @c positions apply.
+        Same arguments as for get_positions() vs @c positions
+        apply. Further difference compared to the @c types field is
+        that these are the type codes (int, not string) as the model
+        wants them.
 
         @see get_positions()
     */
@@ -375,9 +391,12 @@ namespace mytest {
 
         @param factor The factor that the box lengths will be
                       multiplied with.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
     */
-    void scale(double factor) {
-      deform(Voigt6<double>(factor, factor, factor, 0, 0, 0));
+    void scale(double factor,
+               const std::map<std::string,int>& typemap) {
+      deform(Voigt6<double>(factor, factor, factor, 0, 0, 0), typemap);
     }
 
     /** Scale box in a, b, and c direction.
@@ -388,9 +407,12 @@ namespace mytest {
         @param factor_a Multiply box vector a by this factor.
         @param factor_b Multiply box vector b by this factor.
         @param factor_c Multiply box vector c by this factor.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
     */
-    void scale(double factor_a, double factor_b, double factor_c) {
-      deform(Voigt6<double>(factor_a, factor_b, factor_c, 0, 0, 0));
+    void scale(double factor_a, double factor_b, double factor_c,
+               const std::map<std::string,int>& typemap) {
+      deform(Voigt6<double>(factor_a, factor_b, factor_c, 0, 0, 0), typemap);
     }
 
     /** Set box vector lengths.
@@ -401,11 +423,15 @@ namespace mytest {
         @param len_a Scale box vector a to have this length.
         @param len_b Scale box vector b to have this length.
         @param len_c Scale box vector c to have this length.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
     */
-    void scale_to(double len_a, double len_b, double len_c) {
+    void scale_to(double len_a, double len_b, double len_c,
+                  const std::map<std::string,int>& typemap) {
       scale(len_a / box_side_lengths_[0],
             len_b / box_side_lengths_[1],
-            len_c / box_side_lengths_[2]);
+            len_c / box_side_lengths_[2],
+            typemap);
     }
 
 
@@ -418,11 +444,14 @@ namespace mytest {
         identity matrix: ε<sub>ij</sub> + δ<sub>ij</sub>.
 
         @param defmatrix The deformation matrix in Voigt notation.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
 
         @todo Take care that the box stays orthorhombic if
               kim_neighbor_mode is KIM_mi_opbc_f.
     */
-    void deform(Voigt6<double> defmatrix);
+    void deform(Voigt6<double> defmatrix,
+                const std::map<std::string,int>& typemap);
 
     /** Deform box to fit the given box vectors.
 
@@ -592,6 +621,8 @@ namespace mytest {
 
         @param i The index of the atom.
         @param new_pos The new position of atom i.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -602,12 +633,13 @@ namespace mytest {
                              @c true.
     */
     void set_position(unsigned i, const Vec3D<double> new_pos,
+                      const std::map<std::string,int>& typemap,
                       bool update_ghosts = true){
       box_->positions(i,0) = new_pos[0];
       box_->positions(i,1) = new_pos[1];
       box_->positions(i,2) = new_pos[2];
       if (update_ghosts)
-        box_->update_ghost_rvecs();
+        box_->update_ghost_rvecs(typemap);
     }
 
     /** Set position of an atom.
@@ -618,6 +650,8 @@ namespace mytest {
         @param x The new x position of atom i.
         @param y The new y position of atom i.
         @param z The new z position of atom i.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -628,12 +662,13 @@ namespace mytest {
                              @c true.
     */
     void set_position(unsigned i, double x, double y, double z,
+                      const std::map<std::string,int>& typemap,
                       bool update_ghosts = true){
       box_->positions(i,0) = x;
       box_->positions(i,1) = y;
       box_->positions(i,2) = z;
       if (update_ghosts)
-        box_->update_ghost_rvecs();
+        box_->update_ghost_rvecs(typemap);
     }
 
     /** Move atom by specified offset.
@@ -643,6 +678,8 @@ namespace mytest {
         @param i The index of the atom.
         @param offset The offset. Will be added to the position of
                       atom i.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -653,12 +690,13 @@ namespace mytest {
                              @c true.
     */
     void move_atom(unsigned i, const Vec3D<double> offset,
+                   const std::map<std::string,int>& typemap,
                    bool update_ghosts = true){
       box_->positions(i,0) += offset[0];
       box_->positions(i,1) += offset[1];
       box_->positions(i,2) += offset[2];
       if (update_ghosts)
-        box_->update_ghost_rvecs();
+        box_->update_ghost_rvecs(typemap);
     }
 
     /** Move atom by specified offset.
@@ -672,6 +710,8 @@ namespace mytest {
                         atom i.
         @param offset_z The z offset. Will be added to the position of
                         atom i.
+        @param typemap Mapping of atom type strings to the model's
+                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -683,12 +723,13 @@ namespace mytest {
     */
     void move_atom(unsigned i,
                    double offset_x, double offset_y, double offset_z,
+                   const std::map<std::string,int>& typemap,
                    bool update_ghosts = true){
       box_->positions(i,0) += offset_x;
       box_->positions(i,1) += offset_y;
       box_->positions(i,2) += offset_z;
       if (update_ghosts)
-        box_->update_ghost_rvecs();
+        box_->update_ghost_rvecs(typemap);
     }
 
     /** Compute values using KIM.

@@ -51,7 +51,7 @@ namespace mytest {
 
          Initialize a Box object.
 
-      computer <name> <box> <modelname>
+      model <name> <box> <modelname>
 
          Initialize a Compute object.
 
@@ -98,7 +98,7 @@ namespace mytest {
       Arguments with a question mark are booleans, denoted using
       "true"/"false".
   */
-  void parse(const std::string& command,
+  void parse(std::string command,
              std::map< std::string,std::unique_ptr<Box> >& boxes,
              std::map<std::string,Compute>& computes);
 }

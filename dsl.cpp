@@ -92,9 +92,13 @@ static KIMNeigh to_neighmode(const string& s) {
 }
 
 
-void mytest::parse(const string& command,
+void mytest::parse(string command,
                    map< string,unique_ptr<Box> >& boxes,
                    map<string,Compute>& computes) {
+  // Remove comments.
+  auto comment_sign = find(command.begin(), command.end(), '#');
+  command.erase(comment_sign, command.end());
+  // Tokenize non-comment part.
   vector<string> tokens = tokenize(command);
   if (tokens.size() == 0)
     // No command given.
@@ -106,10 +110,9 @@ void mytest::parse(const string& command,
       return;
     }
     try {
-      vector<int> types;
+      vector<string> types;
       for (unsigned i = 12; i != tokens.size(); ++i)
-        //types.psuh_back(compute.get_particle_type_code(tokens[i]));
-        types.push_back(0); // TODO: cannot know the mapping here :-(    
+        types.push_back(tokens[i]);
       auto p = make_unique<Box>(tokens[2], to_double(tokens[3]), // Lattice
                                 to_bool(tokens[4]), // Cubic?
                                 to_unsigned(tokens[5]), // repeat a
@@ -127,7 +130,7 @@ void mytest::parse(const string& command,
       cout << e.what() << endl;
       return;
     }
-  } else if (tokens[0] == "computer") {
+  } else if (tokens[0] == "model") {
     // Create a compute
     if (tokens.size() < 4) {
       cout << "Not enough arguments." << endl;

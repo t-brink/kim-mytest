@@ -40,6 +40,7 @@ int main() {
     parse(input, boxes, computes);
   return 0;
 
+  /*
   const vector<int> types1{ 0 };
   Compute comp1(make_unique<Box>("fcc", 3.940, true, 3, 3, 3,
                                  true, true, true,
@@ -223,4 +224,5 @@ int main() {
   cout << "c15 = " << compAr.elastic_constant(1,5,0.005,true) * 160.2177 << endl;
   cout << "c16 = " << compAr.elastic_constant(1,6,0.005,true) * 160.2177 << endl;
   return 0;
+  */
 }

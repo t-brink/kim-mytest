@@ -1,5 +1,7 @@
 * A simple scripting language to drive the program.
 
+* Benchmark replacing map with unordered_map!
+
 * Neighborlists using ghost atoms are somewhat implemented
 ** neighbor lists need "skin" [This is possible already but Compute
    just sets a zero skin. This must be user-definable because the
@@ -8,9 +10,7 @@
 
 * Way to optimize box volume and shape in addition to positions
 ** Simple scaling of abs(a), abs(b) and abs(c) is already possible.
-
-* bulk modulus curves with relaxation
-* elastic constants (stiffness tensor)
+*** although it seems buggy for non-orthorhombix boxes.
 
 * All in all the following properties should be calculated for
    different lattices:
@@ -20,8 +20,6 @@
 ** stiffness tensor with and without atomic relaxation
 ** surface properties
 *** relaxation, stress, energy
-
-* make it possible to do this all with different neighbor list methods
 
 * Monte-Carlo
 

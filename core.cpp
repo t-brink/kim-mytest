@@ -2,7 +2,7 @@
 //#include <cstdio>
 #include <utility>
 #include <cmath>
-#include <chrono>
+//#include <chrono>
 
 #include <KIM_API_C.h>
 #include <KIM_API_status.h>
@@ -22,7 +22,7 @@ Box::Box(const Vec3D<double>& a_in,
          const Vec3D<double>& c_in,
          bool periodic_a, bool periodic_b, bool periodic_c,
          unique_ptr< Array2D<double> > coordinates,
-         unique_ptr< Array1D<int> > types_in,
+         unique_ptr< Array1DInit<string> > types_in,
          KIMNeigh neighmode, const string& name)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
@@ -58,7 +58,7 @@ Box::Box(const Vec3D<double>& a_in,
 Box::Box(const std::string& lattice, double lattice_const, bool cubic,
          unsigned repeat_a, unsigned repeat_b, unsigned repeat_c,
          bool periodic_a, bool periodic_b, bool periodic_c,
-         const std::vector<int>& types_in,
+         const vector<string>& types_in,
          KIMNeigh neighmode, const std::string& name)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
@@ -79,7 +79,7 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
   Vec3D<double> unit_a;
   Vec3D<double> unit_b;
   Vec3D<double> unit_c;
-  typedef pair<Vec3D<double>,int> t_atom;
+  typedef pair<Vec3D<double>,string> t_atom;
   vector<t_atom> atoms;   // (position, type)
 
   if (lattice == "dimer") {
@@ -321,7 +321,8 @@ Box::Box(const Box& other)
 
 
 
-bool Box::update_neighbor_list(double cutoff, double skin) {
+bool Box::update_neighbor_list(double cutoff, double skin,
+                               const map<string,int>& typemap) {
   const double cut = (1 + skin) * cutoff;
   if (kim_neighbor_mode == KIM_mi_opbc_f
       && (cut > 0.5 * box_side_lengths_[0]
@@ -364,7 +365,7 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
   }
 
   // Update ghosts.
-  update_ghosts();
+  update_ghosts(typemap);
 
   // Clear neighbor lists.
   for (auto& l : neigh_list_)
@@ -490,7 +491,7 @@ bool Box::update_neighbor_list(double cutoff, double skin) {
   return reallocated;
 }
 
-void Box::update_ghosts() {
+void Box::update_ghosts(const map<string,int>& typemap) {
   // Copy original atoms, enforcing periodic boundaries if the
   // neighbor mode is MI_OPBC_F.
   if (kim_neighbor_mode == KIM_mi_opbc_f)
@@ -499,7 +500,7 @@ void Box::update_ghosts() {
       (*ghost_positions)(i, 0) = pmod(positions(i, 0), box_side_lengths_[0]);
       (*ghost_positions)(i, 1) = pmod(positions(i, 1), box_side_lengths_[1]);
       (*ghost_positions)(i, 2) = pmod(positions(i, 2), box_side_lengths_[2]);
-      (*ghost_types)(i) = types(i);
+      (*ghost_types)(i) = typemap.at(types(i));
     }
   else
     // Just assign without wrapping.
@@ -507,7 +508,7 @@ void Box::update_ghosts() {
       (*ghost_positions)(i, 0) = positions(i, 0);
       (*ghost_positions)(i, 1) = positions(i, 1);
       (*ghost_positions)(i, 2) = positions(i, 2);
-      (*ghost_types)(i) = types(i);
+      (*ghost_types)(i) = typemap.at(types(i));
     }
   unsigned ii = natoms_;
   const int alo = -static_cast<int>(ghost_shells[0]);
@@ -526,15 +527,15 @@ void Box::update_ghosts() {
           (*ghost_positions)(ii, 0) = (*ghost_positions)(i, 0) + offset[0];
           (*ghost_positions)(ii, 1) = (*ghost_positions)(i, 1) + offset[1];
           (*ghost_positions)(ii, 2) = (*ghost_positions)(i, 2) + offset[2];
-          (*ghost_types)(ii) = types(i);
+          (*ghost_types)(ii) = typemap.at(types(i));
           ++ii;
         }
       }
 }
 
 
-void Box::update_ghost_rvecs() {
-  update_ghosts();
+void Box::update_ghost_rvecs(const map<string,int>& typemap) {
+  update_ghosts(typemap);
   if (kim_neighbor_mode == KIM_neigh_rvec_f) {
     for (unsigned i = 0; i != natoms_; ++i) {
       const unsigned jjmax = neigh_list_[i].size();
@@ -604,7 +605,8 @@ void Box::write_to(ostream& output) const {
 }
 
 
-void Box::deform(Voigt6<double> defmatrix) {
+void Box::deform(Voigt6<double> defmatrix,
+                 const map<string,int>& typemap) {
   // Check MI_OPBC_F constraints.
   if (kim_neighbor_mode == KIM_mi_opbc_f
       && (abs(defmatrix(3)) > DELTA
@@ -648,7 +650,7 @@ void Box::deform(Voigt6<double> defmatrix) {
   }
 
   // Update ghosts etc.
-  update_ghost_rvecs();
+  update_ghost_rvecs(typemap);
 }
 
 
@@ -682,7 +684,7 @@ unsigned Box::atoms_per_unit_cell(const string& lattice, bool cubic) {
   throw runtime_error("unknown lattice");
 }
 
-unsigned Box::species_per_unit_cell(const std::string& lattice) {
+unsigned Box::species_per_unit_cell(const string& lattice) {
   if (lattice == "sc" || lattice == "bcc" || lattice == "fcc"
       || lattice == "diamond")
     return 1;
@@ -850,10 +852,12 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                         + string(" of file ") + string(__FILE__));
 
   // Check if the atom types in the box are supported by the model.
+  // TODO: enforce type string not type code!!     
   for (int i = 0; i != box_->types.extent(0); ++i)
-    if (partcl_type_names.find(box_->types(i)) == partcl_type_names.end())
+    if (partcl_type_codes.find(box_->types(i)) == partcl_type_codes.end())
       // Unknown particle code.
-      throw runtime_error("Unknown particle code: "+to_string(box_->types(i)));
+      throw runtime_error("Model does not support particle type: "
+                          + box_->types(i));
 
   // Init KIM.
   status = KIM_API_string_init(&model, descriptor.c_str(),
@@ -1056,7 +1060,8 @@ int Compute::get_neigh(KIM_API_model** kimmdl,
 void Compute::update_neighbor_list() {
   int status;
   // TODO: For now the skin is 0.
-  const bool arrays_changed = box_->update_neighbor_list(cutoff, 0.0);
+  const bool arrays_changed = box_->update_neighbor_list(cutoff, 0.0,
+                                                         partcl_type_codes);
   if (arrays_changed) {
     const unsigned n = box_->nall;
     if (has_forces) forces.resize(3 * n);
@@ -1142,10 +1147,10 @@ double Compute::obj_func_box(const vector<double>& x, vector<double>& grad,
                         "1 or 3 parameters.");
   // Scale box, we assume the neighbor list doesn't change (TODO?).
   if (x.size() == 3)
-    c.box_->scale_to(x[0], x[1], x[2]);
+    c.box_->scale_to(x[0], x[1], x[2], c.partcl_type_codes);
   else {
     const double factor = x[0] / c.box_->box_side_lengths[0];
-    c.box_->scale(factor);
+    c.box_->scale(factor, c.partcl_type_codes);
   }
   c.compute();
   ++c.fit_counter;
@@ -1197,7 +1202,7 @@ double Compute::obj_func_pos(const vector<double>& x, vector<double>& grad,
   double* pos = &(c.box_->positions(0,0));
   for (unsigned i = 0; i != c.box_->natoms; ++i)
     pos[i] = x[i];
-  c.box_->update_ghost_rvecs();
+  c.box_->update_ghost_rvecs(c.partcl_type_codes);
   c.compute();
   ++c.fit_counter;
   // Fill gradient.
@@ -1288,160 +1293,3 @@ void Compute::update_kim_after_box_change() {
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
 }
-
-
-
-
-
-void do_something(const char* lat, double lat_const, KIMNeigh neighmode) {
-  string neighmode_str;
-  switch (neighmode) {
-  case KIM_cluster:
-    neighmode_str = "CLUSTER";
-    break;
-  case KIM_mi_opbc_f:
-    neighmode_str = "MI_OPBC_F";
-    break;
-  case KIM_neigh_pure_f:
-    neighmode_str = "NEIGH_PURE_F";
-    break;
-  case KIM_neigh_rvec_f:
-    neighmode_str = "NEIGH_RVEC_F";
-    break;
-  default:
-    throw runtime_error("unknown neighbor mode.");
-  }
-  // Init.
-  const vector<int> types{ 0 };
-  Compute comp(make_unique<Box>(lat, lat_const*0.9, true, 3, 3, 3,
-                                true, true, true,
-                                types, neighmode, "box"),
-               "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_000");
-
-  comp.set_parameter("PARAM_FREE_Rc", vector<unsigned>{ 0, 0, 0 }, 2.9, false);
-  comp.set_parameter("PARAM_FREE_Dc", vector<unsigned>{ 0, 0, 0 }, 0.15);
-  comp.update_neighbor_list();
-  /*
-  comp.compute();
-  cout << comp.get_energy_per_atom() << " eV/atom";
-  for (unsigned i = 0; i != 6; ++i)
-    printf("  %8.4g", comp.get_virial()(i));
-  cout << endl;
-  */
-
-  chrono::steady_clock::time_point start;
-  chrono::steady_clock::time_point stop;
-  chrono::duration<double> delta;
-
-  comp.move_atom(0, 0.2, 0.0, 0.0);
-
-  /*
-  cout << comp.get_particle_type_code("Si") << " : "
-       << comp.get_particle_type_name(0) << endl;
-  */
-  printf("== Box scaling ================ %12s ============\n",
-         neighmode_str.c_str());
-  comp.compute();
-  cout << "\nBefore optimization: "
-       << comp.get_energy_per_atom() << " eV/atom" << endl;
-  try {
-    start = chrono::steady_clock::now();
-    comp.optimize_box(0.001, 10000);
-    stop = chrono::steady_clock::now();
-    delta = chrono::duration_cast<chrono::duration<double>>(stop - start);
-    cout << "After " << comp.get_optimization_steps() << " steps: "
-         << comp.get_energy_per_atom() << " eV/atom"
-         << "                       took " << delta.count() << " s."
-         << endl;
-    cout << "a = " << comp.get_a().abs()/3 << "  "
-         << "b = " << comp.get_b().abs()/3 << "  "
-         << "c = " << comp.get_c().abs()/3 << "  "
-         << "goal = " << lat_const << endl;
-  } catch (const exception& e) {
-    cout << "NLopt failed :-(" << endl;
-  }
-  cout << endl;
-
-  printf("== Position scaling =========== %12s ============\n",
-         neighmode_str.c_str());
-  comp.compute();
-  cout << "\nBefore optimization: "
-       << comp.get_energy_per_atom() << " eV/atom" << endl;
-  try {
-    start = chrono::steady_clock::now();
-    comp.optimize_positions(0.001, 10000);
-    stop = chrono::steady_clock::now();
-    delta = chrono::duration_cast<chrono::duration<double>>(stop - start);
-    cout << "After " << comp.get_optimization_steps() << " steps: "
-         << comp.get_energy_per_atom() << " eV/atom"
-         << "                       took " << delta.count() << " s."
-         << endl;
-  } catch (const exception& e) {
-    cout << "NLopt failed :-(" << endl;
-  }
-  cout << endl;
-
-  printf("== Box scaling II ============= %12s ============\n",
-         neighmode_str.c_str());
-  comp.compute();
-  cout << "\nBefore optimization: "
-       << comp.get_energy_per_atom() << " eV/atom" << endl;
-  try {
-    start = chrono::steady_clock::now();
-    comp.optimize_box(0.001, 10000);
-    stop = chrono::steady_clock::now();
-    delta = chrono::duration_cast<chrono::duration<double>>(stop - start);
-    cout << "After " << comp.get_optimization_steps() << " steps: "
-         << comp.get_energy_per_atom() << " eV/atom"
-         << "                       took " << delta.count() << " s."
-         << endl;
-    cout << "a = " << comp.get_a().abs()/3 << "  "
-         << "b = " << comp.get_b().abs()/3 << "  "
-         << "c = " << comp.get_c().abs()/3 << "  "
-         << "goal = " << lat_const << endl;
-  } catch (const exception& e) {
-    cout << "NLopt failed :-(" << endl;
-  }
-  cout << endl;
-}
-
-
-/*
-int main() {
-  const char lat[] = "fcc";
-  const double lat_const = 3.940;
-  vector<int> types;
-  types.push_back(0);
-  //types.push_back(0);
-  Box b(lat, lat_const, true, 2, 2, 2, true, true, true,
-        types, KIM_neigh_pure_f, "box");
-
-  b.update_neighbor_list(2.92, 0.0);
-
-  const int i = 0;
-  cout << "Neighbors of atom " << i << ":";
-  for (const auto& j : b.get_neighbors(i)) {
-    printf("  %6d", j);
-  }
-  cout << endl;
-  cout << "    distance from " << i << ":";
-  for (const auto& j : b.get_neighbors(i)) {
-    printf("  %6.3f", b.calc_dist(i,j));
-  }
-  cout << endl << endl;
-
-  // b.write_to("dump");
-
-  //////////////////////////////////////////////////////////////////////
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_rvec_f);
-  return 0;
-  do_something(lat, lat_const, KIM_cluster);
-  do_something(lat, lat_const, KIM_mi_opbc_f);
-  do_something(lat, lat_const, KIM_neigh_pure_f);
-  do_something(lat, lat_const, KIM_neigh_rvec_f);
-
-  return 0;
-}
-*/

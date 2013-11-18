@@ -92,7 +92,7 @@ BMParams Compute::bulk_modulus_energy(vector<double>& volumes,
   vector<unique_ptr<Box>> boxes;
   for (int i = -5; i <= 5; ++i) {
     unique_ptr<Box> p = copy_box();
-    p->scale(i*epsilon + 1);
+    p->scale(i*epsilon + 1, partcl_type_codes);
     volumes.push_back(p->calc_volume());
     boxes.push_back(move(p));
   }
@@ -171,7 +171,7 @@ BMParams Compute::bulk_modulus_pressure(vector<double>& volumes,
   vector<unique_ptr<Box>> boxes;
   for (int i = -5; i <= 5; ++i) {
     unique_ptr<Box> p = copy_box();
-    p->scale(i*epsilon + 1);
+    p->scale(i*epsilon + 1, partcl_type_codes);
     volumes.push_back(p->calc_volume());
     boxes.push_back(move(p));
   }
@@ -236,7 +236,7 @@ double Compute::elastic_constant(unsigned i, unsigned j,
     const double eps = i*epsilon;
     Voigt6<double> defmatrix(1.0, 1.0, 1.0, 0.0, 0.0, 0.0);
     defmatrix(ii) += eps;
-    p->deform(defmatrix);
+    p->deform(defmatrix, partcl_type_codes);
     strain.push_back(eps);
     volumes.push_back(p->calc_volume());
     boxes.push_back(move(p));

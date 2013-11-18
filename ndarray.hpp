@@ -506,7 +506,7 @@ namespace mytest {
       other.keep_data = true; // Avoid double-freeing memory.
     }
 
-    ~Array1D() {
+    virtual ~Array1D() {
       if (!keep_data)
         std::free(data);
     }
@@ -536,13 +536,48 @@ namespace mytest {
       return *this;
     }
 
-  private:
+  protected:
     T* data;
+
+  private:
     int size_;
     bool keep_data;
 
     // Do not use!
     Array1D& operator=(const Array1D&) {}
+  };
+
+  /*!  This is basically the same as Array1D but initializes memory
+    when allocating. */
+  template<typename T>
+  class Array1DInit : public Array1D<T> {
+  public:
+    //! External memory management.
+    explicit Array1DInit(T* data, int size)
+      : Array1D<T>(data, size),
+        keep_data_outer(true)
+    {}
+
+    //! Manage data by the class.
+    explicit Array1DInit(int size)
+      : Array1D<T>(new T[size], size),
+        keep_data_outer(false)
+    {}
+
+    //! Move constructor.
+    Array1DInit(Array1DInit<T>&& other)
+      : Array1D<T>(move(other)),
+        keep_data_outer(other.keep_data_outer)
+    {
+      other.keep_data_outer = true; // Avoid double-freeing memory.
+    }
+
+    ~Array1DInit() {
+      if (!keep_data_outer)
+        delete[] this->data;
+    }
+  private:
+    bool keep_data_outer;
   };
 
 
