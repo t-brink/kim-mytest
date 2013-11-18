@@ -1162,7 +1162,7 @@ double Compute::obj_func_box(const vector<double>& x, vector<double>& grad,
 }
 
 double Compute::optimize_box(double ftol_abs, unsigned maxeval,
-                             bool isotropic) {
+                             bool isotropic, bool global) {
   // Check if optimizing box is supported. Box optimization needs
   // energy, so check if that is provided.
   if (!has_energy)
@@ -1177,20 +1177,37 @@ double Compute::optimize_box(double ftol_abs, unsigned maxeval,
   }
   static const vector<double> lb1 = { 0.0 }; // Lengths may not be negative.
   static const vector<double> lb3 = { 0.0, 0.0, 0.0 };
+  const vector<double> ub1 = { 2*lengths[0] };
+  const vector<double> ub3 = { 2*lengths[0], 2*lengths[1], 2*lengths[2] };
   // TODO: We use a gradient-free algorithm for now, although the
   // gradient should be obtainable from the virial (is it even exactly
   // the virial?).
   double obj_val;
-  nlopt::opt optimizer(nlopt::LN_SBPLX, isotropic ? 1 : 3);
-  optimizer.set_min_objective(Compute::obj_func_box, this);
-  optimizer.set_lower_bounds(isotropic ? lb1 : lb3);
-  optimizer.set_initial_step(0.05); // This may not be too big!  TODO:
-                                    // user-definable or better
-                                    // heuristics?
   fit_counter = 0;
-  optimizer.set_maxeval(maxeval);
-  optimizer.set_ftol_abs(ftol_abs);
-  optimizer.optimize(lengths, obj_val);
+  if (global) {
+    nlopt::opt optimizer(nlopt::GN_ISRES, isotropic ? 1 : 3);
+    optimizer.set_min_objective(Compute::obj_func_box, this);
+    optimizer.set_lower_bounds(isotropic ? lb1 : lb3);
+    optimizer.set_upper_bounds(isotropic ? ub1 : ub3);
+    optimizer.set_initial_step(0.05); // This may not be too big!  TODO:
+                                      // user-definable or better
+                                      // heuristics?
+    optimizer.set_maxeval(maxeval);
+    optimizer.set_ftol_abs(ftol_abs);
+    optimizer.optimize(lengths, obj_val);
+  }
+  {
+    nlopt::opt optimizer(nlopt::LN_SBPLX, isotropic ? 1 : 3);
+    optimizer.set_min_objective(Compute::obj_func_box, this);
+    optimizer.set_lower_bounds(isotropic ? lb1 : lb3);
+    optimizer.set_initial_step(0.01); // This may not be too big!  TODO:
+                                      // user-definable or better
+                                      // heuristics?
+    //fit_counter = 0;
+    optimizer.set_maxeval(maxeval);
+    optimizer.set_ftol_abs(ftol_abs);
+    optimizer.optimize(lengths, obj_val);
+  }
   return obj_val;
 }
 
