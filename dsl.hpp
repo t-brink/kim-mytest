@@ -63,7 +63,7 @@ namespace mytest {
       optimize_box <computer_name> [<isotropic?>]
 
          Optimize box vector lengths and print new lattice vectors, as
-         well as energy and stress.
+         well as energy and stress. Default for isotropic is false.
 
       optimize_positions <computer_name>
 

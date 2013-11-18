@@ -173,11 +173,65 @@ void mytest::parse(string command,
     }
     cout << "Cohesive energy: "
          << iter->second.get_energy_per_atom() << " eV/atom" << endl;
-  } else if (tokens[0] == "optimize_box")
-    ;
-  else if (tokens[0] == "optimize_positions")
-    ;
-  else if (tokens[0] == "bulk_modulus_energy")
+  } else if (tokens[0] == "optimize_box") {
+    // Optimize box.
+    if (tokens.size() < 2) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 3) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    // Do it.
+    try {
+      auto iter = computes.find(tokens[1]);
+      if (iter == computes.end()) {
+        cout << "Unknown model: " << tokens[1] << endl;
+        return;
+      }
+      Compute& comp = iter->second;
+      if (tokens.size() == 2)
+        comp.optimize_box(0.001, 10000, false);
+      else
+        comp.optimize_box(0.001, 10000, to_bool(tokens[2]));
+      cout << "New box vectors after " << comp.get_optimization_steps() << " steps:"
+           << endl;
+      printf("a: %10.4g %10.4g %10.4g\n",comp.get_a()[0],comp.get_a()[1],comp.get_a()[2]);
+      printf("b: %10.4g %10.4g %10.4g\n",comp.get_b()[0],comp.get_b()[1],comp.get_b()[2]);
+      printf("c: %10.4g %10.4g %10.4g\n",comp.get_c()[0],comp.get_c()[1],comp.get_c()[2]);
+      cout << "Cohesive energy is now " << comp.get_energy_per_atom() << " eV/atom"
+           << endl;
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+  } else if (tokens[0] == "optimize_positions") {
+    // Optimize positions.
+    if (tokens.size() < 2) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 2) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    // Do it.
+    try {
+      auto iter = computes.find(tokens[1]);
+      if (iter == computes.end()) {
+        cout << "Unknown model: " << tokens[1] << endl;
+        return;
+      }
+      Compute& comp = iter->second;
+      comp.optimize_positions(0.001, 10000);
+      cout << "After " << comp.get_optimization_steps() << " steps:"
+           << endl;
+      cout << "Cohesive energy is now " << comp.get_energy_per_atom() << " eV/atom"
+           << endl;
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+  } else if (tokens[0] == "bulk_modulus_energy")
     ;
   else if (tokens[0] == "bulk_modulus_pressure")
     ;
