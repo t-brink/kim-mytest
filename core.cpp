@@ -1275,6 +1275,7 @@ unique_ptr<Box> Compute::change_box(unique_ptr<Box> new_box) {
 
 
 void Compute::update_kim_after_box_change() {
+  update_neighbor_list();
   int status;
   const unsigned n = box_->nall;
   forces.resize(3 * n);

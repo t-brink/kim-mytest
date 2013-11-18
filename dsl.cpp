@@ -185,8 +185,33 @@ void mytest::parse(string command,
     ;
   else if (tokens[0] == "switch_boxes")
     ;
-  else if (tokens[0] == "change_box")
-    ;
-  else
+  else if (tokens[0] == "change_box") {
+    // Change box in Compute.
+    if (tokens.size() < 3) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 3) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    // Do it.
+    try {
+      const auto iter = boxes.find(tokens[2]);
+      if (iter == boxes.end()) {
+        cout << "Unknown box: " << tokens[2] << endl;
+        return;
+      }
+      auto b = make_unique<Box>(*(iter->second));
+      const auto iter_comp = computes.find(tokens[1]);
+      if (iter_comp == computes.end()) {
+        cout << "Unknown model: " << tokens[1] << endl;
+        return;
+      }
+      iter_comp->second.change_box(move(b));
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+  } else
     cout << "Unknown command " << tokens[0] << endl;
 }

@@ -1083,6 +1083,9 @@ namespace mytest {
         Both boxes must have the same KIM neighbor list type and use
         the same KIM model.
 
+        Will implicitly call update_neighbor_list() for both Compute
+        objects.
+
         @param other Another Compute object with which to switch boxes.
     */
     void switch_boxes(Compute& other);
@@ -1091,6 +1094,8 @@ namespace mytest {
 
         Both boxes must have the same KIM neighbor list type. Neighbor
         lists are not updated.
+
+        Will implicitly call update_neighbor_list().
 
         @param new_box The new box.
         @return The old box.
