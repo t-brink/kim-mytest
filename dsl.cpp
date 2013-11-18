@@ -72,7 +72,7 @@ static unsigned to_unsigned(const string& s) {
 static bool to_bool(const string& s) {
   if (to_lower(s) == "true")
     return true;
-  else if (to_lower(s) == "true")
+  else if (to_lower(s) == "false")
     return false;
   else
     throw runtime_error("not a boolean: " + s);
