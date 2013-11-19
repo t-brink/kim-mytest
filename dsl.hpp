@@ -95,6 +95,10 @@ namespace mytest {
 
          Change box in computer to a new box.
 
+      scale <model_name> <factor_a> [<factor_b> <factor_c>]
+
+         Scale box by given factor(s).
+
       Arguments with a question mark are booleans, denoted using
       "true"/"false".
   */

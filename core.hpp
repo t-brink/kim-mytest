@@ -411,9 +411,7 @@ namespace mytest {
                        type codes.
     */
     void scale(double factor_a, double factor_b, double factor_c,
-               const std::map<std::string,int>& typemap) {
-      deform(Voigt6<double>(factor_a, factor_b, factor_c, 0, 0, 0), typemap);
-    }
+               const std::map<std::string,int>& typemap);
 
     /** Set box vector lengths.
 
@@ -1105,6 +1103,14 @@ namespace mytest {
     /** Return a copy of the internal simulation box. */
     std::unique_ptr<Box> copy_box() const {
       return make_unique<Box>(*box_);
+    }
+
+    /** Scale the box.
+
+        @see Box::scale
+    */
+    void scale_box(double factor_a, double factor_b, double factor_c) {
+      box_->scale(factor_a, factor_b, factor_c, partcl_type_codes);
     }
 
   private:

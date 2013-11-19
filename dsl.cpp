@@ -266,6 +266,24 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
+  } else if (tokens[0] == "scale") {
+    if (tokens.size() != 3 && tokens.size() != 5) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto comp = computes.find(tokens[1]);
+    if (comp == computes.end()) {
+      cout << "Unknown model: " << tokens[1] << endl;
+      return;
+    }
+    if (tokens.size() == 3) {
+      cout << "Not implemented..." << endl;
+      return;
+    } else {
+      comp->second.scale_box(to_double(tokens[2]),
+                             to_double(tokens[3]),
+                             to_double(tokens[4]));
+    }
   } else
     cout << "Unknown command " << tokens[0] << endl;
 }

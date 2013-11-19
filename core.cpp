@@ -605,6 +605,41 @@ void Box::write_to(ostream& output) const {
 }
 
 
+void Box::scale(double factor_a, double factor_b, double factor_c,
+                const map<string,int>& typemap) {
+  // Get transformation matrix.
+  Array2D<double> T(3,3); T = 0.0;
+  const double vol = calc_volume();
+  const Vec3D<double> bxc = cross(b_, c_);
+  const Vec3D<double> cxa = cross(c_, a_);
+  const Vec3D<double> axb = cross(a_, b_);
+
+  for (unsigned i = 0; i != 3; ++i)
+    for (unsigned j = 0; j != 3; ++j)
+      T(i,j) = ( a_[i]*factor_a*bxc[j] + b_[i]*factor_b*cxa[j] + c_[i]*factor_c*axb[j] ) / vol;
+
+  // Update box.
+  a_ *= factor_a;
+  b_ *= factor_b;
+  c_ *= factor_c;
+
+  // Update positions
+  for (unsigned atom = 0; atom != natoms_; ++atom) {
+    Vec3D<double> pos(0.0, 0.0, 0.0);
+    for (unsigned i = 0; i != 3; ++i)
+      for (unsigned j = 0; j != 3; ++j) {
+        pos[i] += T(i,j)*positions(atom,j);
+      }
+    // Assign back.
+    for (unsigned dim = 0; dim != 3; ++dim)
+      positions(atom,dim) = pos[dim];
+  }
+
+  // Update ghosts etc.
+  update_ghost_rvecs(typemap);
+}
+
+
 void Box::deform(Voigt6<double> defmatrix,
                  const map<string,int>& typemap) {
   // Check MI_OPBC_F constraints.

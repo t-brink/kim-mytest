@@ -637,6 +637,13 @@ namespace mytest {
       return data[i*extent_inner + j];
     }
 
+    Array2D& operator=(const T& rhs) {
+      const int size = extent_outer * extent_inner;
+      for (int i = 0; i != size; ++i)
+        data[i] = rhs;
+      return *this;
+    }
+
     Array2D<T>& operator*=(const T& rhs) {
       const int size = extent_outer * extent_inner;
       for (int i = 0; i != size; ++i)
