@@ -814,15 +814,11 @@ namespace mytest {
         @param isotropic If this is true, the box will only be scaled
                          by a single factor, i.e. c/a and b/a are
                          constant. Optional, default is @c false.
-        @param global Use a global optimization algorithm. This is
-                      slow but might help if the initial box is far
-                      from equilibrium. Optional, default is @c false.
         @return The potential energy of the optimized box.
     */
     double optimize_box(double ftol_abs = 0.001,
                         unsigned maxeval = 10000,
-                        bool isotropic = false,
-                        bool global = false);
+                        bool isotropic = false);
 
     /** Optimize atomic positions to minimize energy.
 
