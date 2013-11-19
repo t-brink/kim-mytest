@@ -55,43 +55,43 @@ namespace mytest {
 
          Initialize a Compute object.
 
-      compute <computer_name>
+      compute <model_name>
 
          Calculates and prints energy and stress (from virial) if
          supported.
 
-      optimize_box <computer_name> [<isotropic?>]
+      optimize_box <model_name> [<isotropic?>]
 
          Optimize box vector lengths and print new lattice vectors, as
          well as energy and stress. Default for isotropic is false.
 
-      optimize_positions <computer_name>
+      optimize_positions <model_name>
 
          Optimize atomic positions and print energy and stress.
 
-      bulk_modulus_energy <computer_name> <max_strain>
+      bulk_modulus_energy <model_name> <max_strain>
                           [<c_to_a?> [<b_to_a?> [<positions>
                           [<angle_ab?> [<angle_ac?> [<angle_bc>]]]]]]
 
          Calculate bulk modulus using energy-volume curves.  Print E0,
          V0, B0, B0'.
 
-      bulk_modulus_pressure <computer_name> <max_strain>
+      bulk_modulus_pressure <model_name> <max_strain>
                             [<c_to_a?> [<b_to_a?> [<positions?>
                             [<angle_ab?> [<angle_ac?> [<angle_bc?>]]]]]]
 
          Calculate bulk modulus using pressure-volume curves.  Print
          V0, B0, B0'.
 
-      stiffness_tensor <computer_name> <max_strain> <positions?>
+      stiffness_tensor <model_name> <max_strain> <positions?>
 
          Calculate and print all elastic constants c_ij.
 
-      switch_boxes <computer1_name> <computer2_name>
+      switch_boxes <model1_name> <model2_name>
 
          Switch boxes of both Compute objects.
 
-      change_box <computer_name> <box_name>
+      change_box <model_name> <box_name>
 
          Change box in computer to a new box.
 

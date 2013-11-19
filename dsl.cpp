@@ -231,13 +231,101 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
-  } else if (tokens[0] == "bulk_modulus_energy")
-    ;
-  else if (tokens[0] == "bulk_modulus_pressure")
-    ;
-  else if (tokens[0] == "stiffness_tensor")
-    ;
-  else if (tokens[0] == "switch_boxes")
+  } else if (tokens[0] == "bulk_modulus_energy") {
+    if (tokens.size() < 3) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 9) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    const auto comp = computes.find(tokens[1]);
+    if (comp == computes.end()) {
+      cout << "Unknown model: " << tokens[1] << endl;
+      return;
+    }
+    const bool c_to_a = (tokens.size() > 3) ? to_bool(tokens[3])
+                                             : false;
+    const bool b_to_a = (tokens.size() > 4) ? to_bool(tokens[4])
+                                             : false;
+    const bool positions = (tokens.size() > 5) ? to_bool(tokens[5])
+                                                : false;
+    const bool angle_ab = (tokens.size() > 6) ? to_bool(tokens[6])
+                                               : false;
+    const bool angle_ac = (tokens.size() > 7) ? to_bool(tokens[7])
+                                               : false;
+    const bool angle_bc = (tokens.size() > 8) ? to_bool(tokens[8])
+                                               : false;
+    const BMParams bmp = comp->second.bulk_modulus_energy(to_double(tokens[2]),
+                                                          c_to_a, b_to_a,
+                                                          positions,
+                                                          angle_ab, angle_ac,
+                                                          angle_bc);
+    const unsigned natoms = comp->second.get_natoms();
+    cout << "E0  = " << bmp.E0 / natoms << " eV/atom" << endl;
+    cout << "V0  = " << bmp.V0 / natoms << " Ang/atom" << endl;
+    cout << "B0  = " << bmp.B0 * 160.2177 << " GPa" << endl;
+    cout << "B0' = " << bmp.dB0_dp << endl;
+
+  } else if (tokens[0] == "bulk_modulus_pressure") {
+    if (tokens.size() < 3) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 9) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    const auto comp = computes.find(tokens[1]);
+    if (comp == computes.end()) {
+      cout << "Unknown model: " << tokens[1] << endl;
+      return;
+    }
+    const bool c_to_a = (tokens.size() > 3) ? to_bool(tokens[3])
+                                             : false;
+    const bool b_to_a = (tokens.size() > 4) ? to_bool(tokens[4])
+                                             : false;
+    const bool positions = (tokens.size() > 5) ? to_bool(tokens[5])
+                                                : false;
+    const bool angle_ab = (tokens.size() > 6) ? to_bool(tokens[6])
+                                               : false;
+    const bool angle_ac = (tokens.size() > 7) ? to_bool(tokens[7])
+                                               : false;
+    const bool angle_bc = (tokens.size() > 8) ? to_bool(tokens[8])
+                                               : false;
+    const BMParams bmp =comp->second.bulk_modulus_pressure(to_double(tokens[2]),
+                                                           c_to_a, b_to_a,
+                                                           positions,
+                                                           angle_ab, angle_ac,
+                                                           angle_bc);
+    const unsigned natoms = comp->second.get_natoms();
+    cout << "V0  = " << bmp.V0 / natoms << " Ang/atom" << endl;
+    cout << "B0  = " << bmp.B0 * 160.2177 << " GPa" << endl;
+    cout << "B0' = " << bmp.dB0_dp << endl;
+  } else if (tokens[0] == "stiffness_tensor") {
+    if (tokens.size() < 3) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 4) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    const auto comp = computes.find(tokens[1]);
+    if (comp == computes.end()) {
+      cout << "Unknown model: " << tokens[1] << endl;
+      return;
+    }
+    const double max_strain = to_double(tokens[2]);
+    const bool positions = (tokens.size() > 3) ? to_bool(tokens[3])
+                                                : false;
+    for (unsigned i = 1; i <= 6; ++i) {
+      for (unsigned j = 1; j <= 6; ++j) {
+        const double cij = comp->second.elastic_constant(i,j,max_strain,
+                                                         positions);
+        printf("%8.2f  ", cij * 160.2177);
+      }
+      cout << "GPa" << endl;
+    }
+  } else if (tokens[0] == "switch_boxes")
     ;
   else if (tokens[0] == "change_box") {
     // Change box in Compute.
