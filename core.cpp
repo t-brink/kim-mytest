@@ -771,6 +771,8 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
 
   // Assemble KIM descriptor file.
   string descriptor =
+    "KIM_API_Version  := 1.6.0\n"
+    "\n"
     "Unit_length      := A\n"
     "Unit_energy      := eV\n"
     "Unit_charge      := e\n"
@@ -805,19 +807,25 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   // in the KIM descriptor.  Also add species to the test descriptor.
   descriptor +=
     "\n"
-    "# Supported atom types\n";
+    "PARTICLE_SPECIES:\n";
   KIM_API_model* query;
   status = KIM_API_model_info(&query, modelname.c_str());
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
-  char* pt = query->get_model_partcl_typs(&ntypes, &status);
+  int max_str_len;
+  status = query->get_num_model_species(&ntypes, &max_str_len);
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
   for (int i = 0; i != ntypes; ++i) {
-    const string t(&pt[i*KIM_KEY_STRING_LENGTH]);
-    int code = query->get_partcl_type_code(t.c_str(), &status);
+    const char* partcl_type;
+    status = query->get_model_species(i, &partcl_type);
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+    string t(partcl_type);
+    int code = query->get_species_code(partcl_type, &status);
     if (status < KIM_STATUS_OK)
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
@@ -826,7 +834,6 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
     // Add to descriptor.
     descriptor += t + " spec " + to_string(code) + "\n";
   }
-  free(pt);
 
   // Get supported inputs/outputs/computes.
   query->get_index("get_neigh", &status);
@@ -850,10 +857,10 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
 
   descriptor +=
     "\n"
-    "# Model input\n"
+    "MODEL_INPUT:\n"
     "numberOfParticles    integer   none      []\n"
-    "numberParticleTypes  integer   none      []\n"
-    "particleTypes        integer   none      [numberOfParticles]\n"
+    "numberOfSpecies      integer   none      []\n"
+    "particleSpecies      integer   none      [numberOfParticles]\n"
     "coordinates          double    length    [numberOfParticles,3]\n";
   if (has_get_neigh)
     descriptor += "get_neigh            method    none      []\n";
@@ -863,7 +870,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
     descriptor += "boxSideLengths       double    length    [3]\n";
   descriptor +=
     "\n"
-    "# Model output\n"
+    "MODEL_OUTPUT\n"
     "destroy              method    none      []\n"
     "compute              method    none      []\n"
     "cutoff               double    length    []\n";
@@ -908,7 +915,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   // now.
   model->setm_data(&status, 7*4,
        "numberOfParticles",   1, &box_->nall,                1,
-       "numberParticleTypes", 1, &ntypes,                    1,
+       "numberOfSpecies",     1, &ntypes,                    1,
        "neighObject",         1, this,                       int(has_neighObject),
        "boxSideLengths",      3, &box_->box_side_lengths[0], int(has_boxSideLengths),
        "cutoff",              1, &cutoff,                    1,
@@ -935,13 +942,18 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
 
   // Store free parameter names of the model.
   int n_params;
-  char* param_names = model->get_free_params(&n_params, &status);
+  status = model->get_num_free_params(&n_params, &max_str_len);
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
   for (int i = 0; i != n_params; ++i) {
-    const string param_name = &param_names[i*KIM_KEY_STRING_LENGTH];
-    const int param_index = model->get_index(param_name.c_str(), &status);
+    const char* pn;
+    status = model->get_free_parameter(i, &pn);
+    if (status < KIM_STATUS_OK)
+      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                          + string(" of file ") + string(__FILE__));
+    const string param_name(pn);
+    const int param_index = model->get_index(pn, &status);
     if (status < KIM_STATUS_OK)
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
@@ -966,7 +978,6 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                                forward_as_tuple(param_name, param_shape,
                                                 param_index));
   }
-  free(param_names);
 
   // Now that we know the cutoff, we calculate neighbor lists and
   // ghost atoms.  Then we allocate memory for variable length data
@@ -1104,7 +1115,7 @@ void Compute::update_neighbor_list() {
     if (has_particleVirial) particleVirial.resize(6 * n);
     model->setm_data(&status, 5*4, // TODO: use indices!
         "coordinates",    3*n, box_->get_positions_ptr(), 1,
-        "particleTypes",    n, box_->get_types_ptr(),     1,
+        "particleSpecies",  n, box_->get_types_ptr(),     1,
         "forces",         3*n, &forces[0],                int(has_forces),
         "particleEnergy",   n, &particleEnergy[0],        int(has_particleEnergy),
         "particleVirial", 6*n, &particleVirial[0],        int(has_particleVirial)
@@ -1320,7 +1331,7 @@ void Compute::update_kim_after_box_change() {
       "numberOfParticles",   1, &box_->nall,                1,
       "boxSideLengths",      3, &box_->box_side_lengths[0], int(has_boxSideLengths),
       "coordinates",       3*n, box_->get_positions_ptr(),  1,
-      "particleTypes",       n, box_->get_types_ptr(),      1,
+      "particleSpecies",     n, box_->get_types_ptr(),      1,
       "forces",            3*n, &forces[0],                 int(has_forces),
       "particleEnergy",      n, &particleEnergy[0],         int(has_particleEnergy),
       "particleVirial",    6*n, &particleVirial[0],         int(has_particleVirial)

@@ -1,4 +1,4 @@
-#  Copyright (c) 2013 Tobias Brink
+#  Copyright (c) 2013,2014 Tobias Brink
 #
 #  Permission is hereby granted, free of charge, to any person obtaining
 #  a copy of this software and associated documentation files (the
@@ -19,22 +19,37 @@
 #  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 #  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# load all basic KIM make configuration
-include ../Makefile.KIM_Config
+# First set the location of the kim-api-build-config util.
+KIMCFG=../bin/kim-api-build-config
 
-# set test specific details
-TEST_NAME := mytest
+CXX=$(shell $(KIMCFG) --cxx)
+LD=$(shell $(KIMCFG) --ld)
 
-LOCALOBJ = core.o elastic.o dsl.o
+KIMINCLUDES=$(shell $(KIMCFG) --includes)
+INCLUDES="-I./nlopt/include/"
 
-LOCALCLEAN =
+CXXFLAGS=$(shell $(KIMCFG) --cxxflags)
+LDFLAGS=$(shell $(KIMCFG) --ldflags)
+LDLIBS=$(shell $(KIMCFG) --ldlibs)
 
-# APPEND to compiler option flag lists
-#FFLAGS   +=
-#CCFLAGS  +=
-CXXFLAGS += -std=c++11 -Inlopt/include
-LDFLAGS  += -Wl,-rpath,nlopt/lib -Lnlopt/lib
-LDDYNAMICLIB += -lnlopt -lm
+PWD=$(shell pwd)
 
-# load remaining KIM make configuration
-include $(KIM_DIR)/MAKE_SYSTEM/Makefile.Test
+all: mytest
+
+clean:
+	rm -f mytest core.o elastic.o dsl.o mytest.o
+
+mytest: core.o elastic.o dsl.o mytest.o
+	$(LD) $(LDFLAGS) -L$(PWD)/nlopt/lib/ -Wl,-rpath $(PWD)/nlopt/lib/ -std=c++11 -o mytest mytest.o core.o elastic.o dsl.o $(LDLIBS) -lnlopt
+
+core.o: core.cpp core.hpp
+	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o core.o -c core.cpp
+
+elastic.o: elastic.cpp elastic.hpp
+	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o elastic.o -c elastic.cpp
+
+dsl.o: dsl.cpp dsl.hpp
+	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o dsl.o -c dsl.cpp
+
+mytest.o: mytest.cpp
+	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o mytest.o mytest.cpp
