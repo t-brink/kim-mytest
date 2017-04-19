@@ -1,3 +1,30 @@
+* TESTS
+
+** the bash scripts should probably go into the C++ code???
+   how to expose a maximum number of tests to the KIM project pipeline?
+   how to have one command to test *everything* locally?
+
+*** for the "everything" test: output if certain features are not
+    supported by the model
+
+** additional test: change the box shape in various ways, especially
+   for the virial
+
+** additional tests: change the atom types
+
+** additional test: "amorphous" system (perhaps poisson disk sampling
+   with some minimum distance)
+
+** a better summary of tests (show only failure?)
+
+** more lattice constants and so on
+
+** test lattice optimization and so on
+
+
+
+
+
 * A simple scripting language to drive the program.
 
 * Benchmark replacing map with unordered_map!

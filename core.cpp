@@ -1063,6 +1063,25 @@ void Compute::compute() {
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
 
+  // Before reducing the ghost atoms, calculate the global virial from
+  // forces. This can be used to verify the global virial returned by
+  // the model.
+  global_virial_from_forces_xx = 0.0;
+  global_virial_from_forces_yy = 0.0;
+  global_virial_from_forces_zz = 0.0;
+  global_virial_from_forces_yz = 0.0;
+  global_virial_from_forces_xz = 0.0;
+  global_virial_from_forces_xy = 0.0;
+  const double* ghost_pos = box_->get_positions_ptr();
+  for (unsigned i = 0; i < box_->nall; ++i) {
+    global_virial_from_forces_xx -= ghost_pos[3*i + 0] * forces[3*i + 0];
+    global_virial_from_forces_yy -= ghost_pos[3*i + 1] * forces[3*i + 1];
+    global_virial_from_forces_zz -= ghost_pos[3*i + 2] * forces[3*i + 2];
+    global_virial_from_forces_yz -= ghost_pos[3*i + 1] * forces[3*i + 2];
+    global_virial_from_forces_xz -= ghost_pos[3*i + 0] * forces[3*i + 2];
+    global_virial_from_forces_xy -= ghost_pos[3*i + 0] * forces[3*i + 1];
+  }
+
   // Tricks to fix values when ghost atoms are in the game.
   if (box_->nghosts)
     switch (neighbor_mode) {

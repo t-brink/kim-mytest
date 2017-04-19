@@ -509,6 +509,65 @@ void mytest::parse(string command,
            "", vyy - virial.yy, vyz - virial.yz);
     printf("  %16s %16s %+16.10f\n",
            "", "", vzz - virial.zz);
+  } else if (tokens[0] == "diff_total_virial_vs_virial_from_forces") {
+    if (tokens.size() != 2) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    try {
+      iter->second.compute();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    Voigt6<double> virial = iter->second.get_virial();
+    Voigt6<double> virial_forces = iter->second.get_virial_from_forces();
+    cout << "Virial diff:" << endl;
+    printf("  %+16.10f %+16.10f %+16.10f\n",
+           virial_forces.xx - virial.xx,
+           virial_forces.xy - virial.xy,
+           virial_forces.xz - virial.xz);
+    printf("  %16s %+16.10f %+16.10f\n",
+           "",
+           virial_forces.yy - virial.yy,
+           virial_forces.yz - virial.yz);
+    printf("  %16s %16s %+16.10f\n",
+           "",
+           "",
+           virial_forces.zz - virial.zz);
+    /*
+    cout << "Virial model:" << endl;
+    printf("  %+16.10f %+16.10f %+16.10f\n",
+           virial.xx,
+           virial.xy,
+           virial.xz);
+    printf("  %16s %+16.10f %+16.10f\n",
+           "",
+           virial.yy,
+           virial.yz);
+    printf("  %16s %16s %+16.10f\n",
+           "",
+           "",
+           virial.zz);
+    cout << "Virial forces:" << endl;
+    printf("  %+16.10f %+16.10f %+16.10f\n",
+           virial_forces.xx,
+           virial_forces.xy,
+           virial_forces.xz);
+    printf("  %16s %+16.10f %+16.10f\n",
+           "",
+           virial_forces.yy,
+           virial_forces.yz);
+    printf("  %16s %16s %+16.10f\n",
+           "",
+           "",
+           virial_forces.zz);
+    */
   } else if (tokens[0] == "print") {
     if (command.size() > 6)
       cout << command.substr(6) << flush;

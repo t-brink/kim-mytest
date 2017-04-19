@@ -803,6 +803,21 @@ namespace mytest {
                             particleVirial[6*i + 5]);
     }
 
+    /** Get the global virial tensor computed from forces.
+
+        This can be used to verify the global virial tensor from the
+        model.
+
+     */
+    Voigt6<double> get_virial_from_forces() const {
+      return Voigt6<double>(global_virial_from_forces_xx,
+                            global_virial_from_forces_yy,
+                            global_virial_from_forces_zz,
+                            global_virial_from_forces_yz,
+                            global_virial_from_forces_xz,
+                            global_virial_from_forces_xy);
+    }
+
     /** Change model parameter.
 
         @param param_name KIM name of the free parameter.
@@ -1197,6 +1212,13 @@ namespace mytest {
     std::vector<double> forces;
     std::vector<double> particleEnergy;
     std::vector<double> particleVirial;
+    // For testing: global virial computed from forces.
+    double global_virial_from_forces_xx,
+           global_virial_from_forces_yy,
+           global_virial_from_forces_zz,
+           global_virial_from_forces_yz,
+           global_virial_from_forces_xz,
+           global_virial_from_forces_xy;
     // Store current index of KIM iteration. This (at least) makes
     // this class not thread safe!
     unsigned kim_iter_pos;
