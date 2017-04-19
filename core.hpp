@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013 Tobias Brink
+  Copyright (c) 2013,2017 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -748,10 +748,24 @@ namespace mytest {
       return energy;
     };
 
+    /** Get the computed potential energy of atom i. */
+    double get_energy(unsigned i) const {
+      return particleEnergy[i];
+    };
+
     /** Get the computed potential energy per atom of the box. */
     double get_energy_per_atom() const {
       return energy / box_->natoms;
     };
+
+    /** Get the force of atom i, component dim */
+    double get_force(unsigned i, unsigned dim) {
+      if (dim >= 3)
+        throw std::runtime_error("invalid dim");
+      if (i >= box_->natoms)
+        throw std::runtime_error("invalid atom id");
+      return forces[3*i + dim];
+    }
 
     /** Get the computed virial tensor. */
     Voigt6<double> get_virial() const {
@@ -1075,6 +1089,9 @@ namespace mytest {
       std::vector<double> stress;
       return elastic_constant(i, j, strain, stress, max_strain, positions);
     }
+
+    /** ................... @todo */   
+    double max_diff_force();  
 
     /** Switch the contained Box objects between two Compute objects.
 

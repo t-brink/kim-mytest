@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013 Tobias Brink
+  Copyright (c) 2013,2017 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -372,6 +372,46 @@ void mytest::parse(string command,
                              to_double(tokens[3]),
                              to_double(tokens[4]));
     }
+  } else if (tokens[0] == "numer_forces_deriv") {
+    if (tokens.size() != 2) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    double max_diff_force = 666;
+    try {
+      max_diff_force = iter->second.max_diff_force();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    if (abs(max_diff_force) > 1e-3)
+      cout << "Maximum force deviation: " << max_diff_force
+           << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+    else
+      cout << "Maximum force deviation: " << max_diff_force << endl;
+    cout << endl;
+    for (unsigned i = 0; i < iter->second.get_natoms(); ++i) {
+      printf("Forces on atom %3d:", i);
+      for (unsigned dim = 0; dim < 3; ++dim)
+        printf(" %+10.3e", iter->second.get_force(i, dim));
+      printf("   pos:");
+      Vec3D<double> pos = iter->second.get_position(i);
+      for (unsigned dim = 0; dim < 3; ++dim)
+        printf(" %7.4f", pos[dim]);
+      printf("\n");
+    }
+  } else if (tokens[0] == "print") {
+    if (tokens.size() > 1) {
+      cout << tokens[1];
+      for (unsigned i = 2; i < tokens.size(); ++i)
+        cout << " " << tokens[i];
+    }
+    cout << endl;
   } else
     cout << "Unknown command " << tokens[0] << endl;
 }
