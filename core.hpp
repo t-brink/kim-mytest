@@ -791,6 +791,18 @@ namespace mytest {
       return virial;
     }
 
+    /** Get the computed virial tensor for atom i. */
+    Voigt6<double> get_virial(unsigned i) const {
+      if (i >= box_->natoms)
+        throw std::runtime_error("invalid atom id");
+      return Voigt6<double>(particleVirial[6*i + 0],
+                            particleVirial[6*i + 1],
+                            particleVirial[6*i + 2],
+                            particleVirial[6*i + 3],
+                            particleVirial[6*i + 4],
+                            particleVirial[6*i + 5]);
+    }
+
     /** Change model parameter.
 
         @param param_name KIM name of the free parameter.

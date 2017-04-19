@@ -422,11 +422,10 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
-    if (abs(max_diff_force) > 1e-3)
-      cout << "Maximum force deviation: " << max_diff_force
-           << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
-    else
-      cout << "Maximum force deviation: " << max_diff_force << endl;
+    cout << "Maximum force deviation: " << max_diff_force;
+    if (abs(max_diff_force) > 1e-5)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
     /*
     cout << endl;
     iter->second.compute(); // otherwise we get the displaced one!!
@@ -443,6 +442,73 @@ void mytest::parse(string command,
       printf("\n");
     }
     */
+  } else if (tokens[0] == "diff_total_energy_vs_particle_energy") {
+    if (tokens.size() != 2) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    try {
+      iter->second.compute();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    unsigned N = iter->second.get_natoms();
+    double E = iter->second.get_energy();
+    double Epart = 0.0;
+    for (unsigned i = 0; i < N; ++i) {
+      Epart += iter->second.get_energy(i);
+    }
+    double diff = abs(E - Epart);
+    cout << "Energy diff: " << diff;
+    if (diff > 1e-5)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+  } else if (tokens[0] == "diff_total_virial_vs_particle_virial") {
+    if (tokens.size() != 2) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    try {
+      iter->second.compute();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    unsigned N = iter->second.get_natoms();
+    Voigt6<double> virial = iter->second.get_virial();
+    double vxx = 0.0;
+    double vyy = 0.0;
+    double vzz = 0.0;
+    double vyz = 0.0;
+    double vxz = 0.0;
+    double vxy = 0.0;
+    for (unsigned i = 0; i < N; ++i) {
+      Voigt6<double> vi = iter->second.get_virial(i);
+      vxx += vi.xx;
+      vyy += vi.yy;
+      vzz += vi.zz;
+      vyz += vi.yz;
+      vxz += vi.xz;
+      vxy += vi.xy;
+    }
+    cout << "Virial diff:" << endl;
+    printf("  %+16.10f %+16.10f %+16.10f\n",
+           vxx - virial.xx, vxy - virial.xy, vxz - virial.xz);
+    printf("  %16s %+16.10f %+16.10f\n",
+           "", vyy - virial.yy, vyz - virial.yz);
+    printf("  %16s %16s %+16.10f\n",
+           "", "", vzz - virial.zz);
   } else if (tokens[0] == "print") {
     if (command.size() > 6)
       cout << command.substr(6) << flush;
