@@ -31,6 +31,23 @@
 using namespace std;
 using namespace mytest;
 
+double get_displ_energy(Compute& compute,
+                        const unsigned i,
+                        const unsigned dim,
+                        const Vec3D<double>& orig_pos,
+                        const double eps,
+                        const std::map<std::string,int>& typemap) {
+  Vec3D<double> new_pos(orig_pos);
+  new_pos[dim] += eps;
+  compute.set_position(i, new_pos, typemap);
+  compute.update_neighbor_list();
+  compute.compute();
+  double E = compute.get_energy();
+  compute.set_position(i, orig_pos, typemap);
+  compute.update_neighbor_list();
+  return E;
+}
+
 
 std::tuple<double, double, double>
 df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
@@ -42,56 +59,13 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
   //
   Vec3D<double> orig_pos = compute.get_position(i);
   Array2D<double> a(ntab, ntab);
-  double ep, en;
   double deriv = 0.0;
-  // Pos.
-  {
-    Vec3D<double> new_pos(orig_pos);
-    new_pos[dim] += eps;
-    compute.set_position(i, new_pos, typemap);
-    compute.update_neighbor_list();
-    compute.compute();
-    ep = compute.get_energy();
-    compute.set_position(i, orig_pos, typemap);
-    compute.update_neighbor_list();
-  }
-  // Neg.
-  {
-    Vec3D<double> new_pos(orig_pos);
-    new_pos[dim] -= eps;
-    compute.set_position(i, new_pos, typemap);
-    compute.update_neighbor_list();
-    compute.compute();
-    en = compute.get_energy();
-    compute.set_position(i, orig_pos, typemap);
-    compute.update_neighbor_list();
-  }
-  a(0,0) = (ep - en) / (2 * eps);
   double err = numeric_limits<double>::max();
-  for (unsigned ii = 1; ii < ntab; ++ii) {
-    eps /= con;
-    // Pos.
-    {
-      Vec3D<double> new_pos(orig_pos);
-      new_pos[dim] += eps;
-      compute.set_position(i, new_pos, typemap);
-      compute.update_neighbor_list();
-      compute.compute();
-      ep = compute.get_energy();
-      compute.set_position(i, orig_pos, typemap);
-      compute.update_neighbor_list();
-    }
-    // Neg.
-    {
-      Vec3D<double> new_pos(orig_pos);
-      new_pos[dim] -= eps;
-      compute.set_position(i, new_pos, typemap);
-      compute.update_neighbor_list();
-      compute.compute();
-      en = compute.get_energy();
-      compute.set_position(i, orig_pos, typemap);
-      compute.update_neighbor_list();
-    }
+  for (unsigned ii = 0; ii < ntab; ++ii) {
+    double ep, en;
+    // Displace and calculate energy (positive and negative direction).
+    ep = get_displ_energy(compute, i, dim, orig_pos, +eps, typemap);
+    en = get_displ_energy(compute, i, dim, orig_pos, -eps, typemap);
     a(0,ii) = (ep - en) / (2 * eps);
     double fac = con2;
     for (unsigned jj = 1; jj <= ii; ++jj) {
@@ -106,6 +80,7 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
     }
     if ( abs(a(ii,ii) - a(ii-1,ii-1)) > safe*err )
       break;
+    eps /= con;
   }
 
   return make_tuple(deriv, eps, err);
