@@ -21,6 +21,13 @@
 
 ** test lattice optimization and so on
 
+*** dE/dV = p, and p = virial/V (roughly, signs may be wrong)
+
+    given that, couldn't we use the virial as a gradient for box size
+    optimization? test!
+
+** test changing parameters (hard to say how to verify something here)
+
 
 
 
