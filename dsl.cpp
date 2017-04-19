@@ -394,23 +394,28 @@ void mytest::parse(string command,
            << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
     else
       cout << "Maximum force deviation: " << max_diff_force << endl;
+    /*
     cout << endl;
+    iter->second.compute(); // otherwise we get the displaced one!!
     for (unsigned i = 0; i < iter->second.get_natoms(); ++i) {
       printf("Forces on atom %3d:", i);
       for (unsigned dim = 0; dim < 3; ++dim)
-        printf(" %+10.3e", iter->second.get_force(i, dim));
+        //printf(" %+10.3e", iter->second.get_force(i, dim));
+        printf(" %+16.10f", iter->second.get_force(i, dim));
       printf("   pos:");
       Vec3D<double> pos = iter->second.get_position(i);
       for (unsigned dim = 0; dim < 3; ++dim)
         printf(" %7.4f", pos[dim]);
+      printf("     %7.4f", iter->second.get_energy(i));
       printf("\n");
     }
+    */
   } else if (tokens[0] == "print") {
-    if (tokens.size() > 1) {
-      cout << tokens[1];
-      for (unsigned i = 2; i < tokens.size(); ++i)
-        cout << " " << tokens[i];
-    }
+    if (command.size() > 6)
+      cout << command.substr(6) << flush;
+  } else if (tokens[0] == "println") {
+    if (command.size() > 8)
+      cout << command.substr(8);
     cout << endl;
   } else
     cout << "Unknown command " << tokens[0] << endl;

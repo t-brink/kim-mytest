@@ -51,7 +51,7 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
     compute.set_position(i, new_pos, typemap);
     compute.update_neighbor_list();
     compute.compute();
-    ep = compute.get_energy(i);
+    ep = compute.get_energy();
     compute.set_position(i, orig_pos, typemap);
     compute.update_neighbor_list();
   }
@@ -62,7 +62,7 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
     compute.set_position(i, new_pos, typemap);
     compute.update_neighbor_list();
     compute.compute();
-    en = compute.get_energy(i);
+    en = compute.get_energy();
     compute.set_position(i, orig_pos, typemap);
     compute.update_neighbor_list();
   }
@@ -77,7 +77,7 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
       compute.set_position(i, new_pos, typemap);
       compute.update_neighbor_list();
       compute.compute();
-      ep = compute.get_energy(i);
+      ep = compute.get_energy();
       compute.set_position(i, orig_pos, typemap);
       compute.update_neighbor_list();
     }
@@ -88,7 +88,7 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
       compute.set_position(i, new_pos, typemap);
       compute.update_neighbor_list();
       compute.compute();
-      en = compute.get_energy(i);
+      en = compute.get_energy();
       compute.set_position(i, orig_pos, typemap);
       compute.update_neighbor_list();
     }
@@ -127,7 +127,6 @@ double Compute::max_diff_force() {
   }
   // Calculate forces by numerical derivatives.
   for (unsigned i = 0; i < box_->natoms; ++i) {
-    printf("Forces on atom %3d:", i);  
     for (unsigned dim = 0; dim < 3; ++dim) {
       double eps = 1e-6;
       double last_err = numeric_limits<double>::max();
@@ -150,9 +149,7 @@ double Compute::max_diff_force() {
       double diff = abs(the_forces(i, dim) - num_force);
       if (diff > max_diff)
         max_diff = diff;
-      printf(" %+10.3e", num_force);  
     }
-    printf("\n");  
   }
   return max_diff;
 }

@@ -1,3 +1,26 @@
+/*
+  Copyright (c) 2013,2014,2017 Tobias Brink
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 //#include <iostream>
 //#include <cstdio>
 #include <utility>
@@ -999,6 +1022,15 @@ Compute::~Compute() {
 
 
 void Compute::compute() {
+  // Reset arrays to zero. Dunno if needed, but with ghost atoms I am
+  // unsure.
+  for (unsigned i = 0; i < forces.size(); ++i)
+    forces[i] = 0;
+  for (unsigned i = 0; i < particleEnergy.size(); ++i)
+    particleEnergy[i] = 0;
+  for (unsigned i = 0; i < particleVirial.size(); ++i)
+    particleVirial[i] = 0;
+  // Compute.
   const int status = model->model_compute();
   if (status < KIM_STATUS_OK)
     throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
@@ -1032,7 +1064,7 @@ void Compute::compute() {
       throw runtime_error("this should never happen: there are ghost atoms "
                           "although we use MI_OPBC_F.");
     case KIM_neigh_pure_f:
-      for (unsigned i = box_->natoms; i != box_->nall; ++i) {
+      for (unsigned i = box_->natoms; i < box_->nall; ++i) {
         const unsigned central = i % box_->natoms;
         particleEnergy[central] += particleEnergy[i];
         forces[3*central + 0] += forces[3*i + 0];
@@ -1048,7 +1080,7 @@ void Compute::compute() {
       break;
     default:
       throw runtime_error("unsupported neighbor mode.");
-  }
+    }
 }
 
 
