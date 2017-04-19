@@ -176,6 +176,25 @@ namespace mytest {
     */
     void update_ghost_rvecs(const std::map<std::string,int>& typemap);
 
+    /** Return unique_ptr to new box with atom i deleted.
+
+        @param i         The atom that should be deleted.
+        @param new_name  Name for the new box.
+
+     */
+    std::unique_ptr<Box> delete_atom(unsigned i, const std::string& name);
+
+    /** Return unique_ptr to new box with atom i deleted.
+
+        The new box will have the same name as the old one.
+
+        @param i         The atom that should be deleted.
+
+     */
+    std::unique_ptr<Box> delete_atom(unsigned i) {
+      return delete_atom(i, name_);
+    }
+
     // Public data /////////////////////////////////////////////////////
 
     /** Constant reference to box side lengths.
@@ -1090,8 +1109,13 @@ namespace mytest {
       return elastic_constant(i, j, strain, stress, max_strain, positions);
     }
 
-    /** ................... @todo */   
-    double max_diff_force();  
+    /** Derive force numerically from the energy and return maximum
+        deviation from model forces.
+
+        The maximum deviation is for a single dimension of a single
+        atom (e.g. atom 12's force in y direction).
+    */
+    double max_diff_force();
 
     /** Switch the contained Box objects between two Compute objects.
 

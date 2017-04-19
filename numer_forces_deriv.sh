@@ -35,6 +35,10 @@ firstrun="yes"
               echo "change_box comp $boxname"
             fi
             echo "numer_forces_deriv comp"
+            # Remove a random atom and re-run.
+            echo "delete_atom $boxname"
+            echo "$( printf "print %43s :: " "random atom removed" )"
+            echo "numer_forces_deriv comp"
           done
         done
       done

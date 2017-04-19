@@ -588,9 +588,36 @@ void Box::update_ghost_rvecs(const map<string,int>& typemap) {
 }
 
 
+
+unique_ptr<Box> Box::delete_atom(unsigned i, const string& name) {
+  if (i >= natoms_)
+    throw runtime_error("Deleting non-existant atom.");
+  unsigned new_natoms = natoms_ - 1;
+  unique_ptr< Array2D<double> > new_positions =
+    make_unique< Array2D<double> >(new_natoms, 3);
+  unique_ptr< Array1DInit<string> > new_types =
+    make_unique< Array1DInit<string> >(new_natoms);
+  // Copy all except atom i.
+  for (unsigned j = 0; j < i; ++j) {
+    for (unsigned dim = 0; dim < 3; ++dim)
+      (*new_positions)(j, dim) = positions(j, dim);
+    (*new_types)(j) = types(j);
+  }
+  for (unsigned j = i+1; j < natoms_; ++j) {
+    for (unsigned dim = 0; dim < 3; ++dim)
+      (*new_positions)(j-1, dim) = positions(j, dim);
+    (*new_types)(j-1) = types(j);
+  }
+  return make_unique<Box>(a, b, c, periodic[0], periodic[1], periodic[2],
+                          move(new_positions), move(new_types),
+                          kim_neighbor_mode, name_);
+}
+
+
+
 double Box::calc_dist(int i, int j, double& dx, double& dy, double& dz) const {
   if (!ghost_positions)
-    throw runtime_error("Ghosts no initialized!");
+    throw runtime_error("Ghosts not initialized!");
   dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
   dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
   dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);

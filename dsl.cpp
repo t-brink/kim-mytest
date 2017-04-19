@@ -28,11 +28,17 @@
 #include <iostream>
 #include <cctype>
 #include <algorithm>
+#include <random>
 
 #include "utils.hpp"
 
 using namespace std;
 using namespace mytest;
+
+namespace mytest {
+std::random_device _DSL_RD_;
+std::mt19937 _DSL_RNG_(_DSL_RD_());
+}
 
 vector<string> mytest::tokenize(const string& input) {
   istringstream iss(input);
@@ -130,6 +136,32 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
+  } else if (tokens[0] == "delete_atom") {
+    if (tokens.size() < 2) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 3) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    auto box = boxes.find(tokens[1]);
+    if (box == boxes.end()) {
+      cout << "Unknown box: " << tokens[2] << endl;
+      return;
+    }
+    unsigned i;
+    if (tokens.size() == 2) {
+      // Delete random atom
+      uniform_int_distribution<unsigned> uni_rng(0, box->second->natoms - 1);
+      i = uni_rng(_DSL_RNG_);
+    } else {
+      i = to_unsigned(tokens[2]);
+      if (i >= box->second->natoms) {
+        cout << "Atom " << i << " does not exist." << endl;
+        return;
+      }
+    }
+    boxes[box->first] = box->second->delete_atom(i);
   } else if (tokens[0] == "model") {
     // Create a compute
     if (tokens.size() < 4) {
@@ -326,6 +358,7 @@ void mytest::parse(string command,
       cout << "GPa" << endl;
     }
   } else if (tokens[0] == "switch_boxes")
+    // TODO?                                                 
     ;
   else if (tokens[0] == "change_box") {
     // Change box in Compute.
