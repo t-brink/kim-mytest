@@ -638,8 +638,6 @@ namespace mytest {
 
         @param i The index of the atom.
         @param new_pos The new position of atom i.
-        @param typemap Mapping of atom type strings to the model's
-                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -650,13 +648,12 @@ namespace mytest {
                              @c true.
     */
     void set_position(unsigned i, const Vec3D<double> new_pos,
-                      const std::map<std::string,int>& typemap,
                       bool update_ghosts = true){
       box_->positions(i,0) = new_pos[0];
       box_->positions(i,1) = new_pos[1];
       box_->positions(i,2) = new_pos[2];
       if (update_ghosts)
-        box_->update_ghost_rvecs(typemap);
+        box_->update_ghost_rvecs(partcl_type_codes);
     }
 
     /** Set position of an atom.
@@ -667,8 +664,6 @@ namespace mytest {
         @param x The new x position of atom i.
         @param y The new y position of atom i.
         @param z The new z position of atom i.
-        @param typemap Mapping of atom type strings to the model's
-                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -679,13 +674,12 @@ namespace mytest {
                              @c true.
     */
     void set_position(unsigned i, double x, double y, double z,
-                      const std::map<std::string,int>& typemap,
                       bool update_ghosts = true){
       box_->positions(i,0) = x;
       box_->positions(i,1) = y;
       box_->positions(i,2) = z;
       if (update_ghosts)
-        box_->update_ghost_rvecs(typemap);
+        box_->update_ghost_rvecs(partcl_type_codes);
     }
 
     /** Move atom by specified offset.
@@ -695,8 +689,6 @@ namespace mytest {
         @param i The index of the atom.
         @param offset The offset. Will be added to the position of
                       atom i.
-        @param typemap Mapping of atom type strings to the model's
-                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -707,13 +699,12 @@ namespace mytest {
                              @c true.
     */
     void move_atom(unsigned i, const Vec3D<double> offset,
-                   const std::map<std::string,int>& typemap,
                    bool update_ghosts = true){
       box_->positions(i,0) += offset[0];
       box_->positions(i,1) += offset[1];
       box_->positions(i,2) += offset[2];
       if (update_ghosts)
-        box_->update_ghost_rvecs(typemap);
+        box_->update_ghost_rvecs(partcl_type_codes);
     }
 
     /** Move atom by specified offset.
@@ -727,8 +718,6 @@ namespace mytest {
                         atom i.
         @param offset_z The z offset. Will be added to the position of
                         atom i.
-        @param typemap Mapping of atom type strings to the model's
-                       type codes.
         @param update_ghosts Update the actual positions and ghost
                              atom positions of the box. This must be
                              set to true to actually register your
@@ -740,13 +729,12 @@ namespace mytest {
     */
     void move_atom(unsigned i,
                    double offset_x, double offset_y, double offset_z,
-                   const std::map<std::string,int>& typemap,
                    bool update_ghosts = true){
       box_->positions(i,0) += offset_x;
       box_->positions(i,1) += offset_y;
       box_->positions(i,2) += offset_z;
       if (update_ghosts)
-        box_->update_ghost_rvecs(typemap);
+        box_->update_ghost_rvecs(partcl_type_codes);
     }
 
     /** Deform box by given deformation matrix.

@@ -35,23 +35,21 @@ double get_displ_energy(Compute& compute,
                         const unsigned i,
                         const unsigned dim,
                         const Vec3D<double>& orig_pos,
-                        const double eps,
-                        const std::map<std::string,int>& typemap) {
+                        const double eps) {
   Vec3D<double> new_pos(orig_pos);
   new_pos[dim] += eps;
-  compute.set_position(i, new_pos, typemap);
+  compute.set_position(i, new_pos);
   compute.update_neighbor_list();
   compute.compute();
   double E = compute.get_energy();
-  compute.set_position(i, orig_pos, typemap);
+  compute.set_position(i, orig_pos);
   compute.update_neighbor_list();
   return E;
 }
 
 
 std::tuple<double, double, double>
-df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
-      const std::map<std::string,int>& typemap) {
+df_dr(Compute& compute, unsigned i, unsigned dim, double eps) {
   static const unsigned ntab = 10;
   static const double con = 1.4;
   static const double con2 = con*con;
@@ -64,8 +62,8 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps,
   for (unsigned ii = 0; ii < ntab; ++ii) {
     double ep, en;
     // Displace and calculate energy (positive and negative direction).
-    ep = get_displ_energy(compute, i, dim, orig_pos, +eps, typemap);
-    en = get_displ_energy(compute, i, dim, orig_pos, -eps, typemap);
+    ep = get_displ_energy(compute, i, dim, orig_pos, +eps);
+    en = get_displ_energy(compute, i, dim, orig_pos, -eps);
     a(0,ii) = (ep - en) / (2 * eps);
     double fac = con2;
     for (unsigned jj = 1; jj <= ii; ++jj) {
@@ -107,7 +105,7 @@ double Compute::max_diff_force() {
       double last_err = numeric_limits<double>::max();
       double err, deriv, last_deriv = 0.0;
       for (unsigned iteration = 0; iteration < 15; ++iteration) {
-        auto retval = df_dr(*this, i, dim, eps, this->partcl_type_codes);
+        auto retval = df_dr(*this, i, dim, eps);
         deriv = get<0>(retval);
         eps = get<1>(retval);
         err = get<2>(retval);
