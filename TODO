@@ -7,11 +7,6 @@
 *** for the "everything" test: output if certain features are not
     supported by the model
 
-** additional test: change the box shape in various ways, especially
-   for the virial
-
-** additional tests: change the atom types
-
 ** additional test: "amorphous" system (perhaps poisson disk sampling
    with some minimum distance)
 
