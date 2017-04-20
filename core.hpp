@@ -749,6 +749,23 @@ namespace mytest {
         box_->update_ghost_rvecs(typemap);
     }
 
+    /** Deform box by given deformation matrix.
+
+        Includes scaling of atom positions.  Implicitly calls
+        update_ghost_rvecs().
+
+        A deformation matrix is defined is the strain tensor plus the
+        identity matrix: ε<sub>ij</sub> + δ<sub>ij</sub>.
+
+        @param defmatrix The deformation matrix in Voigt notation.
+
+        @todo Take care that the box stays orthorhombic if
+              kim_neighbor_mode is KIM_mi_opbc_f.
+    */
+    void deform(Voigt6<double> defmatrix) {
+      box_->deform(defmatrix, partcl_type_codes);
+    }
+
     /** Compute values using KIM.
 
         Output values that are not supported by the model are simply

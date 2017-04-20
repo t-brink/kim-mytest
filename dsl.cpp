@@ -146,7 +146,7 @@ void mytest::parse(string command,
     }
     auto box = boxes.find(tokens[1]);
     if (box == boxes.end()) {
-      cout << "Unknown box: " << tokens[2] << endl;
+      cout << "Unknown box: " << tokens[1] << endl;
       return;
     }
     unsigned i;
@@ -187,6 +187,25 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
+  } else if (tokens[0] == "deform_box") {
+    if (tokens.size() < 8) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 8) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown compute: " << tokens[1] << endl;
+      return;
+    }
+    iter->second.deform(Voigt6<double>(to_double(tokens[2]),
+                                       to_double(tokens[3]),
+                                       to_double(tokens[4]),
+                                       to_double(tokens[5]),
+                                       to_double(tokens[6]),
+                                       to_double(tokens[7])));
   } else if (tokens[0] == "compute") {
     if (tokens.size() != 2) {
       cout << "Wrong number of arguments." << endl;
@@ -502,13 +521,32 @@ void mytest::parse(string command,
       vxz += vi.xz;
       vxy += vi.xy;
     }
-    cout << "Virial diff:" << endl;
-    printf("  %+16.10f %+16.10f %+16.10f\n",
-           vxx - virial.xx, vxy - virial.xy, vxz - virial.xz);
-    printf("  %16s %+16.10f %+16.10f\n",
-           "", vyy - virial.yy, vyz - virial.yz);
-    printf("  %16s %16s %+16.10f\n",
-           "", "", vzz - virial.zz);
+    double
+      dxx = vxx - virial.xx,
+      dxy = vxy - virial.xy,
+      dxz = vxz - virial.xz,
+      dyy = vyy - virial.yy,
+      dyz = vyz - virial.yz,
+      dzz = vzz - virial.zz;
+    bool too_large = (abs(dxx) > 1e-5)
+                     || (abs(dxy) > 1e-5)
+                     || (abs(dxz) > 1e-5)
+                     || (abs(dyy) > 1e-5)
+                     || (abs(dyz) > 1e-5)
+                     || (abs(dzz) > 1e-5);
+    cout << "Virial diff:";
+    if (too_large)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+    printf("  %+16.10f %+16.10f %+16.10f", dxx, dxy, dxz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    printf("  %16s %+16.10f %+16.10f", "", dyy, dyz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    printf("  %16s %16s %+16.10f", "", "", dzz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
   } else if (tokens[0] == "diff_total_virial_vs_virial_from_forces") {
     if (tokens.size() != 2) {
       cout << "Wrong number of arguments." << endl;
@@ -527,19 +565,32 @@ void mytest::parse(string command,
     }
     Voigt6<double> virial = iter->second.get_virial();
     Voigt6<double> virial_forces = iter->second.get_virial_from_forces();
-    cout << "Virial diff:" << endl;
-    printf("  %+16.10f %+16.10f %+16.10f\n",
-           virial_forces.xx - virial.xx,
-           virial_forces.xy - virial.xy,
-           virial_forces.xz - virial.xz);
-    printf("  %16s %+16.10f %+16.10f\n",
-           "",
-           virial_forces.yy - virial.yy,
-           virial_forces.yz - virial.yz);
-    printf("  %16s %16s %+16.10f\n",
-           "",
-           "",
-           virial_forces.zz - virial.zz);
+    double
+      dxx = virial_forces.xx - virial.xx,
+      dxy = virial_forces.xy - virial.xy,
+      dxz = virial_forces.xz - virial.xz,
+      dyy = virial_forces.yy - virial.yy,
+      dyz = virial_forces.yz - virial.yz,
+      dzz = virial_forces.zz - virial.zz;
+    bool too_large = (abs(dxx) > 1e-5)
+                     || (abs(dxy) > 1e-5)
+                     || (abs(dxz) > 1e-5)
+                     || (abs(dyy) > 1e-5)
+                     || (abs(dyz) > 1e-5)
+                     || (abs(dzz) > 1e-5);
+    cout << "Virial diff:";
+    if (too_large)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+    printf("  %+16.10f %+16.10f %+16.10f", dxx, dxy, dxz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    printf("  %16s %+16.10f %+16.10f", "", dyy, dyz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    printf("  %16s %16s %+16.10f", "", "", dzz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
     /*
     cout << "Virial model:" << endl;
     printf("  %+16.10f %+16.10f %+16.10f\n",
