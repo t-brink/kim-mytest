@@ -66,9 +66,19 @@ thermo_style custom step temp pe ke etotal enthalpy press vol lx ly lz xy xz yz 
 thermo 1
 
 compute stress all stress/atom NULL virial
+
+# Convert virial from bar*A^3 to eV
+variable xx atom c_stress[1]*6.241508e-7
+variable yy atom c_stress[2]*6.241508e-7
+variable zz atom c_stress[3]*6.241508e-7
+variable xy atom c_stress[4]*6.241508e-7
+variable xz atom c_stress[5]*6.241508e-7
+variable yz atom c_stress[6]*6.241508e-7
+
 compute pe all pe/atom
 
-dump MyDump all custom 1 {outfile} id type x y z c_pe fx fy fz c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
+dump MyDump all custom 1 {outfile} id type x y z c_pe fx fy fz v_xx v_yy v_zz v_xy v_xz v_yz
+dump_modify MyDump format line "%d %d %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g %30.15g"
 
 fix 1 all nve
 
@@ -77,6 +87,7 @@ run 0
 
 
 with tempfile.TemporaryDirectory() as tmpdir:
+    boxinfos = {}
 
     ########################################################################
     # Run self-consistency tests, while writing all boxes to a temp dir.   #
@@ -120,29 +131,31 @@ with tempfile.TemporaryDirectory() as tmpdir:
                                                        shear_xy))
         # Compute.
         p = lambda pbc: "P" if pbc else "O"
-        ex(
-            "println ==> {:<45s} {:2s} {:7s} {:1s} {:1s} {:1s} {:7s} "
-            "1 1 1 {:+5.2f} {:+5.2f} {:+5.2f}{}"
-            "".format(command, elem, lattice,
-                      p(pbc_x), p(pbc_y), p(pbc_z),
-                      ("cubic" if cubic else "minimal"),
-                      shear_yz, shear_xz, shear_xy,
-                      (" delete random atom" if del_atom else ""))
-        )
+        boxinfo = ("{:<45s} {:2s} {:7s} {:1s} {:1s} {:1s} {:7s} "
+                   "1 1 1 {:+5.2f} {:+5.2f} {:+5.2f}{}"
+                   "".format(command, elem, lattice,
+                             p(pbc_x), p(pbc_y), p(pbc_z),
+                             ("cubic" if cubic else "minimal"),
+                             shear_yz, shear_xz, shear_xy,
+                             (" delete random atom" if del_atom else "")))
+        ex("println ==> " + boxinfo)
         if firstrun:
             ex("model comp {} {}".format(boxname, model))
             firstrun = False
         else:
             ex("change_box comp {}".format(boxname))
-        # Write box to tmpdir
-        pbc_str = p(pbc_x) + p(pbc_y) + p(pbc_z)
-        ex(
-            "write_box {} {}".format(
-                boxname,
-                os.path.join(tmpdir,
-                             boxname + "-" + pbc_str + ".xyz")
+        # Write box to tmpdir (only for one command, the boxes are the
+        # same for all commands; use a replicated one)
+        if command == "diff_total_energy_vs_particle_energy":
+            boxinfos[boxname] = boxinfo
+            pbc_str = p(pbc_x) + p(pbc_y) + p(pbc_z)
+            ex(
+                "write_box {} {}".format(
+                    boxname,
+                    os.path.join(tmpdir,
+                                 boxname + "-" + pbc_str + ".xyz")
+                )
             )
-        )
         # Compute.
         ex("{} comp".format(command))
 
@@ -234,6 +247,9 @@ with tempfile.TemporaryDirectory() as tmpdir:
             os._exit(0)
         testfile = fname.rsplit(".", 1)[0] + ".test"
         with open(os.path.join(tmpdir, testfile), "w") as f:
+            # Comment line
+            f.write(boxinfos[fname.rsplit(".", 1)[0].rsplit("-", 1)[0]] + "\n")
+
             f.write(str(len(ase_box)) + "\n") # natoms
 
             f.write(str(ase_box.cell[0,0]) + " ") # a
@@ -251,25 +267,17 @@ with tempfile.TemporaryDirectory() as tmpdir:
             f.write(str(ase_box.cell[2,2]) + " ")
             f.write(str(pbc_bool[2]) + "\n")
 
-            # Convert virial units from bar*Å³ to eV
-            cols["c_stress[1]"] *= 6.241508e-7
-            cols["c_stress[2]"] *= 6.241508e-7
-            cols["c_stress[3]"] *= 6.241508e-7
-            cols["c_stress[4]"] *= 6.241508e-7
-            cols["c_stress[5]"] *= 6.241508e-7
-            cols["c_stress[6]"] *= 6.241508e-7
-
             for items in zip(ase_box,
                              cols["c_pe"],
                              cols["fx"],
                              cols["fy"],
                              cols["fz"],
-                             cols["c_stress[1]"],
-                             cols["c_stress[2]"],
-                             cols["c_stress[3]"],
-                             cols["c_stress[6]"],  # yz
-                             cols["c_stress[5]"],  # xz
-                             cols["c_stress[4]"]): # xy
+                             cols["v_xx"],
+                             cols["v_yy"],
+                             cols["v_zz"],
+                             cols["v_yz"],  # yz
+                             cols["v_xz"],  # xz
+                             cols["v_xy"]): # xy
                 atom = items[0]
                 f.write(atom.symbol + " " +
                         str(atom.position[0]) + " " +
@@ -305,6 +313,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     for box in glob.iglob(os.path.join(tmpdir, "box-*.test")):
         fname = os.path.basename(box)
         boxname = fname.rsplit(".", 1)[0]
+        ex("println")
         ex("check_testfile comp {} {}".format(box, boxname))
 
     proc.stdin.close()

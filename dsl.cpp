@@ -252,6 +252,8 @@ void mytest::parse(string command,
     }
     // Read the box data.
     ifstream testfile(tokens[2]); // TODO: error checking for I/O   
+    string comment;
+    getline(testfile, comment); // first line is comment line.
     unsigned natoms;
     double ax, ay, az, bx, by, bz, cx, cy, cz;
     bool pa, pb, pc;
@@ -321,18 +323,22 @@ void mytest::parse(string command,
       }
     }
     // Output.
+    cout << comment << endl;
+    bool has_err = (abs(max_err_energy) > 1e-5)
+                || (abs(max_err_force) > 1e-5)
+                || (abs(max_err_stress) > 1e-5);
     cout << "Maximum particle energy deviation: " << max_err_energy;
-    if (abs(max_err_energy) > 1e-5)
+    if (has_err)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
     cout << endl;
     //
     cout << "Maximum force deviation: " << max_err_force;
-    if (abs(max_err_force) > 1e-4)
+    if (has_err)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
     cout << endl;
     //
     cout << "Maximum particle virial deviation: " << max_err_stress;
-    if (abs(max_err_stress) > 1e-4)
+    if (has_err)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
     cout << endl;
     //
