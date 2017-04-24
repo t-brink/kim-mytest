@@ -122,6 +122,10 @@ with tempfile.TemporaryDirectory() as tmpdir:
             boxname, lattice, latconst, cubic, repeat,
             pbc_x, pbc_y, pbc_z, elem
         ))
+        # Init compute.
+        if firstrun:
+            ex("model comp {} {}".format(boxname, model))
+            firstrun = False
         # Modifications to the box.
         if del_atom:
             ex("delete_atom {}".format(boxname))
@@ -131,19 +135,15 @@ with tempfile.TemporaryDirectory() as tmpdir:
                                                        shear_xy))
         # Compute.
         p = lambda pbc: "P" if pbc else "O"
-        boxinfo = ("{:<45s} {:2s} {:7s} {:1s} {:1s} {:1s} {:7s} "
+        boxinfo = ("{:2s} {:7s} {:1s} {:1s} {:1s} {:7s} "
                    "1 1 1 {:+5.2f} {:+5.2f} {:+5.2f}{}"
-                   "".format(command, elem, lattice,
+                   "".format(elem, lattice,
                              p(pbc_x), p(pbc_y), p(pbc_z),
                              ("cubic" if cubic else "minimal"),
                              shear_yz, shear_xz, shear_xy,
                              (" delete random atom" if del_atom else "")))
-        ex("println ==> " + boxinfo)
-        if firstrun:
-            ex("model comp {} {}".format(boxname, model))
-            firstrun = False
-        else:
-            ex("change_box comp {}".format(boxname))
+        ex("println ==> {:<45s} ".format(command) + boxinfo)
+        ex("change_box comp {}".format(boxname))
         # Write box to tmpdir (only for one command, the boxes are the
         # same for all commands; use a replicated one)
         if command == "diff_total_energy_vs_particle_energy":
