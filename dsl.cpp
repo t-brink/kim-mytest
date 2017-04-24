@@ -206,6 +206,20 @@ void mytest::parse(string command,
                                        to_double(tokens[5]),
                                        to_double(tokens[6]),
                                        to_double(tokens[7])));
+  } else if (tokens[0] == "write_box") {
+    if (tokens.size() < 3) {
+      cout << "Not enough arguments." << endl;
+      return;
+    } else if (tokens.size() > 3) {
+      cout << "Too many arguments." << endl;
+      return;
+    }
+    auto iter = boxes.find(tokens[1]);
+    if (iter == boxes.end()) {
+      cout << "Unknown box: " << tokens[1] << endl;
+      return;
+    }
+    iter->second->write_to(tokens[2]);
   } else if (tokens[0] == "compute") {
     if (tokens.size() != 2) {
       cout << "Wrong number of arguments." << endl;

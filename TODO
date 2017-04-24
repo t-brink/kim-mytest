@@ -12,6 +12,9 @@
 
 ** a better summary of tests (show only failure?)
 
+** iterate tests also over all combinations of supported features
+   (force on/off, energy on/off) where it makes sense
+
 ** more lattice constants and so on
 
 ** test lattice optimization and so on

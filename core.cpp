@@ -635,23 +635,21 @@ double Box::calc_dist(int i, int j, double& dx, double& dy, double& dz) const {
 
 
 void Box::write_to(ostream& output) const {
-  // Comment line
-  output << name_ << "\n";
-  // Scaling factor, always 1.
-  output << 1.0 << "\n";
-  // Box vectors;
-  output << a[0] << " " << a[1] << " " << a[2] << "\n";
-  output << b[0] << " " << b[1] << " " << b[2] << "\n";
-  output << c[0] << " " << c[1] << " " << c[2] << "\n";
-  // Types. TODO: for now only one type.
+  // Number of atoms.
   output << natoms_ << "\n";
-  // Cartesian coordinates.
-  output << "cartesian\n";
+  // Extended XYZ uses the comment line for metadata like the box shape.
+  output << "Lattice=\""
+         << a[0] << " " << a[1] << " " << a[2] << " "
+         << b[0] << " " << b[1] << " " << b[2] << " "
+         << c[0] << " " << c[1] << " " << c[2] << "\" "
+         << "Properties=species:S:1:pos:R:3\n";
+  // The atoms.
   for (unsigned i = 0; i != natoms_; ++i)
-    output << positions(i,0) << " "
+    output << types(i) << " "
+           << positions(i,0) << " "
            << positions(i,1) << " "
            << positions(i,2) << "\n";
-  output << endl;
+  output << flush;
 }
 
 

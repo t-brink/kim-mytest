@@ -393,11 +393,9 @@ namespace mytest {
       write_to(f);
     };
 
-    /** Write to file.
+    /** Write to file in extended XYZ format.
 
         @param output An output stream.
-
-        @todo: use some useful format (POSCAR needs sorting by atom type :( )
     */
     void write_to(std::ostream& output) const;
 
