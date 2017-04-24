@@ -26,9 +26,11 @@
 #include <sstream>
 #include <iterator>
 #include <iostream>
+#include <fstream>
 #include <cctype>
 #include <algorithm>
 #include <random>
+#include <limits>
 
 #include "utils.hpp"
 
@@ -238,6 +240,102 @@ void mytest::parse(string command,
     }
     cout << "Cohesive energy: "
          << iter->second.get_energy_per_atom() << " eV/atom" << endl;
+  } else if (tokens[0] == "check_testfile") {
+    if (tokens.size() != 4) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    // Read the box data.
+    ifstream testfile(tokens[2]); // TODO: error checking for I/O   
+    unsigned natoms;
+    double ax, ay, az, bx, by, bz, cx, cy, cz;
+    bool pa, pb, pc;
+    testfile >> natoms
+             >> ax >> ay >> az >> pa
+             >> bx >> by >> bz >> pb
+             >> cx >> cy >> cz >> pc;
+    auto coordinates = make_unique< Array2D<double> >(natoms, 3);
+    auto types = make_unique< Array1DInit<string> >(natoms);
+    Array1D<double> energies(natoms);
+    Array2D<double> forces(natoms, 3);
+    Array2D<double> stresses(natoms, 6);
+    for (unsigned i = 0; i < natoms; ++i) {
+      testfile >> (*types)(i)
+               >> (*coordinates)(i, 0)
+               >> (*coordinates)(i, 1)
+               >> (*coordinates)(i, 2)
+               >> energies(i)
+               >> forces(i, 0)
+               >> forces(i, 1)
+               >> forces(i, 2)
+               >> stresses(i, 0)
+               >> stresses(i, 1)
+               >> stresses(i, 2)
+               >> stresses(i, 3)
+               >> stresses(i, 4)
+               >> stresses(i, 5);
+    }
+    // Make a box.
+    auto box = make_unique<Box>(Vec3D<double>(ax, ay, az),
+                                Vec3D<double>(bx, by, bz),
+                                Vec3D<double>(cx, cy, cz),
+                                pa, pb, pc,
+                                move(coordinates),
+                                move(types),
+                                KIM_neigh_pure_f,
+                                tokens[3]);
+    // Assign box to compute.
+    iter->second.change_box(move(make_unique<Box>(*box)));
+    // Store box under its name.
+    boxes[tokens[3]] = move(box);
+    // Compute.
+    try {
+      iter->second.compute();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    double max_err_energy = 0.0;
+    double max_err_force = 0.0;
+    double max_err_stress = 0.0;
+    // Compare.
+    for (unsigned i = 0; i < natoms; ++i) {
+      //
+      double delta_E = abs(iter->second.get_energy(i) - energies(i));
+      if (delta_E > max_err_energy) max_err_energy = delta_E;
+      //
+      for (unsigned dim = 0; dim < 3; ++dim) {
+        double delta_F = abs(iter->second.get_force(i,dim) - forces(i,dim));
+        if (delta_F > max_err_force) max_err_force = delta_F;
+      }
+      //
+      Voigt6<double> v = iter->second.get_virial(i);
+      for (unsigned dim = 0; dim < 6; ++dim) {
+        double delta_v = abs(v(dim) - stresses(i,dim));
+        if (delta_v > max_err_stress) max_err_stress = delta_v;
+      }
+    }
+    // Output.
+    cout << "Maximum particle energy deviation: " << max_err_energy;
+    if (abs(max_err_energy) > 1e-5)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+    //
+    cout << "Maximum force deviation: " << max_err_force;
+    if (abs(max_err_force) > 1e-4)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+    //
+    cout << "Maximum particle virial deviation: " << max_err_stress;
+    if (abs(max_err_stress) > 1e-4)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+    //
   } else if (tokens[0] == "optimize_box") {
     // Optimize box.
     if (tokens.size() < 2) {
