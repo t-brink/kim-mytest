@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     # Run self-consistency tests, while writing all boxes to a temp dir.   #
     ########################################################################
     print("Preparing boxes...", end=" ",
-          file=sys.stderr, flush=True)
+          flush=True)
     start = time.time()
 
     proc = subprocess.Popen(["./mytest"],
@@ -156,12 +156,12 @@ with tempfile.TemporaryDirectory() as tmpdir:
     del proc
 
     stop = time.time()
-    print("done in {:.2f} s.".format(stop-start), file=sys.stderr)
+    print("done in {:.2f} s.".format(stop-start))
 
     ########################################################################
     # Run LAMMPS on the boxes.                                             #
     ########################################################################
-    print("Running LAMMPS on boxes...", end=" ", file=sys.stderr, flush=True)
+    print("Running LAMMPS on boxes...", end=" ", flush=True)
     start = time.time()
 
     devnull = open(os.devnull)
@@ -231,11 +231,10 @@ with tempfile.TemporaryDirectory() as tmpdir:
                                              elem_map_reverse,
                                              extra_columns=True)
         except Exception as e:
-            print(file=sys.stderr)
-            print("Exception occured when trying to read LAMMPS output:",
-                  file=sys.stderr)
-            print(e, file=sys.stderr)
-            print("See {}".format(tmpdir), file=sys.stderr)
+            print()
+            print("Exception occured when trying to read LAMMPS output:")
+            print(e)
+            print("See {}".format(tmpdir))
             os._exit(0)
         testfile = fname.rsplit(".", 1)[0] + ".test"
         with open(os.path.join(tmpdir, testfile), "w") as f:
@@ -280,14 +279,13 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
     stop = time.time()
     print("done in {:.2f} s. Had {} empty boxes."
-          "".format(stop-start, empty_boxes),
-          file=sys.stderr)
+          "".format(stop-start, empty_boxes))
 
     ########################################################################
     # Test the boxes.                                                      #
     ########################################################################
     print("Comparing models results to LAMMPS results...",
-          file=sys.stderr, flush=True)
+          flush=True)
     start = time.time()
 
     proc = subprocess.Popen(["./mytest"],
@@ -312,4 +310,4 @@ with tempfile.TemporaryDirectory() as tmpdir:
     proc.wait()
 
     stop = time.time()
-    print("done in {:.2f} s.".format(stop-start), file=sys.stderr)
+    print("done in {:.2f} s.".format(stop-start))
