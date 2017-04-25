@@ -41,7 +41,8 @@ lammps_cmd = ["/nfshome/brink/PhD/KIM/lmp_serial"]
 lattices = {"diamond": {"Si": "5.429", "C": "3.85"},
             "sc":      {"Si": "2.525", "C": "1.80"},
             "bcc":     {"Si": "3.043", "C": "2.15"},
-            "fcc":     {"Si": "3.940", "C": "2.80"}}
+            "fcc":     {"Si": "3.940", "C": "2.80"},
+            "random":  {"Si": "1.8",   "C": "1.5"}}
 
 shear = 0.05
 
@@ -118,10 +119,15 @@ with tempfile.TemporaryDirectory() as tmpdir:
         # Create the box.
         h_i = hash(i)
         boxname = "box-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
-        ex("box {} {} {} {} {} {} {} {} NEIGH_PURE {}".format(
-            boxname, lattice, latconst, cubic, repeat,
-            pbc_x, pbc_y, pbc_z, elem
-        ))
+        if lattice == "random":
+            ex("random_box {} {} {} {} {} NEIGH_PURE {}".format(
+                boxname, pbc_x, pbc_y, pbc_z, latconst, elem
+            ))
+        else:
+            ex("box {} {} {} {} {} {} {} {} NEIGH_PURE {}".format(
+                boxname, lattice, latconst, cubic, repeat,
+                pbc_x, pbc_y, pbc_z, elem
+            ))
         # Init compute.
         if firstrun:
             ex("model comp {} {}".format(boxname, model))

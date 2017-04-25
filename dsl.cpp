@@ -108,10 +108,10 @@ void mytest::parse(string command,
   command.erase(comment_sign, command.end());
   // Tokenize non-comment part.
   vector<string> tokens = tokenize(command);
-  if (tokens.size() == 0)
+  if (tokens.size() == 0) {
     // No command given.
     return;
-  else if (tokens[0] == "box") {
+  } else if (tokens[0] == "box") {
     // Create a box
     if (tokens.size() < 13) {
       cout << "Not enough arguments." << endl;
@@ -133,6 +133,28 @@ void mytest::parse(string command,
                                 to_neighmode(tokens[11]), // Neighbor list mode
                                 tokens[1] // Name
                                 );
+      boxes[tokens[1]] = move(p);
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+  } else if (tokens[0] == "random_box") {
+    // Create a box
+    if (tokens.size() < 8) {
+      cout << "Not enough arguments." << endl;
+      return;
+    }
+    try {
+      unique_ptr<Box> p =
+        Box::random_box(10.0, 10.0, 10.0,
+                        to_bool(tokens[2]), // periodic a
+                        to_bool(tokens[3]), // periodic b
+                        to_bool(tokens[4]), // periodic c
+                        to_double(tokens[5]), // min_dist between atoms
+                        tokens[7], // Atom type (TODO: more than one)    
+                        to_neighmode(tokens[6]), // Neighbor list mode
+                        tokens[1], // name
+                        _DSL_RNG_);
       boxes[tokens[1]] = move(p);
     } catch (const exception& e) {
       cout << e.what() << endl;
@@ -334,7 +356,7 @@ void mytest::parse(string command,
     //
     cout << "Maximum force deviation: " << max_err_force;
     if (has_err)
-      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+      cout << "               !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
     cout << endl;
     //
     cout << "Maximum particle virial deviation: " << max_err_stress;

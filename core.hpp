@@ -30,6 +30,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <random>
 
 #include <KIM_API.h>
 
@@ -128,6 +129,22 @@ namespace mytest {
     Box(const Box& other);
 
     virtual ~Box() {}
+
+    /** Create a randomly filled box
+
+        @todo: support more than one type and choose randomly!    
+
+     */
+    static
+    std::unique_ptr<Box> random_box(double a, double b, double c,
+                                    bool periodic_a,
+                                    bool periodic_b,
+                                    bool periodic_c,
+                                    double min_dist,
+                                    const std::string& atomtype,
+                                    KIMNeigh neighmode,
+                                    const std::string& name,
+                                    std::mt19937& rng);
 
     /** Initialize and/or update neighbor list.
 

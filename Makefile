@@ -39,8 +39,8 @@ all: mytest
 clean:
 	rm -f mytest *.o
 
-mytest: core.o elastic.o dsl.o mytest.o numer_forces.o
-	$(LD) $(LDFLAGS) -L$(PWD)/nlopt/lib/ -Wl,-rpath $(PWD)/nlopt/lib/ -std=c++11 -o mytest mytest.o core.o elastic.o dsl.o numer_forces.o $(LDLIBS) -lnlopt
+mytest: core.o elastic.o dsl.o mytest.o numer_forces.o poisson_disk_sampling.o
+	$(LD) $(LDFLAGS) -L$(PWD)/nlopt/lib/ -Wl,-rpath $(PWD)/nlopt/lib/ -std=c++11 -o mytest mytest.o core.o elastic.o dsl.o numer_forces.o poisson_disk_sampling.o $(LDLIBS) -lnlopt
 
 core.o: core.cpp core.hpp
 	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o core.o -c core.cpp
@@ -56,3 +56,6 @@ mytest.o: mytest.cpp
 
 numer_forces.o: numer_forces.cpp
 	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o numer_forces.o numer_forces.cpp
+
+poisson_disk_sampling.o: poisson_disk_sampling.cpp
+	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o poisson_disk_sampling.o poisson_disk_sampling.cpp
