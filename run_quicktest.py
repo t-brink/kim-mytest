@@ -98,6 +98,20 @@ with tempfile.TemporaryDirectory() as tmpdir:
     def ex(cmd):
         proc.stdin.write(cmd + "\n")
 
+    # Create random box only once per element.
+    rand_boxes = {}
+    if "random" in lattices:
+        for i in itertools.product(sorted(elements),
+                                   (True, False), (True, False), (True, False)):
+            elem, pbc_x, pbc_y, pbc_z = i
+            h_i = hash(i)
+            boxname = "randbox-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
+            rand_boxes[i] = boxname
+            min_dist = lattices["random"][elem]
+            ex("random_box {} {} {} {} {} NEIGH_PURE {}".format(
+                boxname, pbc_x, pbc_y, pbc_z, min_dist, elem
+            ))
+
     firstrun = True
     for i in itertools.product(sorted(lattices),
                                sorted(elements),
@@ -114,9 +128,8 @@ with tempfile.TemporaryDirectory() as tmpdir:
         h_i = hash(i)
         boxname = "box-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
         if lattice == "random":
-            ex("random_box {} {} {} {} {} NEIGH_PURE {}".format(
-                boxname, pbc_x, pbc_y, pbc_z, latconst, elem
-            ))
+            randboxname = rand_boxes[(elem, pbc_x, pbc_y, pbc_z)]
+            ex("copy_box {} {}".format(randboxname, boxname))
         else:
             ex("box {} {} {} {} {} {} {} {} NEIGH_PURE {}".format(
                 boxname, lattice, latconst, cubic, repeat,

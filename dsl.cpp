@@ -160,6 +160,24 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
+  } else if (tokens[0] == "copy_box") {
+    // Create a box
+    if (tokens.size() != 3) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    auto box = boxes.find(tokens[1]);
+    if (box == boxes.end()) {
+      cout << "Unknown box: " << tokens[1] << endl;
+      return;
+    }
+    try {
+      auto p = make_unique<Box>(*(box->second), tokens[2]);
+      boxes[tokens[2]] = move(p);
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
   } else if (tokens[0] == "delete_atom") {
     if (tokens.size() < 2) {
       cout << "Not enough arguments." << endl;
@@ -348,7 +366,7 @@ void mytest::parse(string command,
     cout << comment << endl;
     bool has_err = (abs(max_err_energy) > 1e-5)
                 || (abs(max_err_force) > 1e-5)
-                || (abs(max_err_stress) > 1e-5);
+                || (abs(max_err_stress) > 1e-4);
     cout << "Maximum particle energy deviation: " << max_err_energy;
     if (has_err)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";

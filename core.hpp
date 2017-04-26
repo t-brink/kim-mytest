@@ -125,6 +125,9 @@ namespace mytest {
         const std::vector<std::string>& types,
         KIMNeigh neighmode, const std::string& name);
 
+    /** Copy constructor that changes the name. */
+    Box(const Box& other, const std::string& new_name);
+
     /** Copy constructor. */
     Box(const Box& other);
 

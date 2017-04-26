@@ -300,6 +300,48 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
   }
 }
 
+Box::Box(const Box& other, const std::string& new_name)
+  : box_side_lengths(box_side_lengths_), // Public const references.
+    a(a_), b(b_), c(c_),
+    periodic(periodic_),
+    kim_neighbor_mode(other.kim_neighbor_mode),
+    natoms(natoms_), nghosts(nghosts_), nall(nall_),
+    positions(other.positions.extent(0), // Public data.
+              other.positions.extent(1)),
+    types(other.types.extent(0)),
+    box_side_lengths_(other.box_side_lengths_), // Private data.
+    a_(other.a_), b_(other.b_), c_(other.c_),
+    periodic_(other.periodic_),
+    natoms_(other.natoms_), nghosts_(other.nghosts_), nall_(other.nall_),
+    name_(new_name),
+    ghost_shells(other.ghost_shells),
+    /*
+    ghost_positions(make_unique<Array2D<double>>(
+                                    other.ghost_positions->extent(0),
+                                    other.ghost_positions->extent(1))),
+    ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
+    */
+    neigh_list_(other.neigh_list_),
+    neigh_rvec_(other.neigh_rvec_),
+    neigh_rvec_shell_(other.neigh_rvec_shell_)
+{
+  for (int i = 0; i != positions.extent(0); ++i)
+    for (int j = 0; j != positions.extent(1); ++j)
+      positions(i,j) = other.positions(i,j);
+  for (int i = 0; i != types.extent(0); ++i)
+    types(i) = other.types(i);
+  if (other.ghost_positions && other.ghost_types) {
+    ghost_positions = make_unique<Array2D<double>>(other.ghost_positions->extent(0),
+                                                   other.ghost_positions->extent(1));
+    ghost_types = make_unique<Array1D<int>>(other.ghost_types->extent(0));
+    for (int i = 0; i != ghost_positions->extent(0); ++i)
+      for (int j = 0; j != ghost_positions->extent(1); ++j)
+        (*ghost_positions)(i,j) = (*other.ghost_positions)(i,j);
+    for (int i = 0; i != ghost_types->extent(0); ++i)
+      (*ghost_types)(i) = (*other.ghost_types)(i);
+  }
+}
+
 Box::Box(const Box& other)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
