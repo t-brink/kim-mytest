@@ -9,27 +9,38 @@ import tempfile
 import glob
 import shutil
 import time
+import collections
 
 import ase, ase.data, ase.io
 import numpy
 
 from mmlib.formats import lammps
 
-
-# TODO: parse arguments
-#
 # TODO: extract Tersoff parameters from model and put them in LAMMPS
 #       format automatically
 
-elements = ["Si", "C"]
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--only-fast", action="store_true", default=False)
+parser.add_argument("--verbose", action="store_true", default=False)
+parser.add_argument("kim_model")
+parser.add_argument("potfile")
+parser.add_argument("lattices", nargs="+")
+args = parser.parse_args()
+
+model = args.kim_model
+lammps_potfile = args.potfile
+elements = []
+lattices = collections.defaultdict(lambda: {})
+for i in args.lattices:
+    l, e, a = i.split(":")
+    lattices[l][e] = a
+    if e not in elements:
+        elements.append(e)
 elem_map = {e: i
             for i, e in enumerate(elements, 1)}
 elem_map_reverse = {i: e
                     for i, e in enumerate(elements, 1)}
-
-model = "Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_002"
-
-lammps_potfile = "Tersoff_SiC_ErhartAlbe.params"
 
 lammps_model = """\
 pair_style tersoff
@@ -37,12 +48,6 @@ pair_coeff * * {} {}
 """.format(lammps_potfile, " ".join(elements))
 
 lammps_cmd = ["/home/brink/bin/lmp_serial"]
-
-lattices = {"diamond": {"Si": "5.429", "C": "3.85"},
-            "sc":      {"Si": "2.525", "C": "1.80"},
-            "bcc":     {"Si": "3.043", "C": "2.15"},
-            "fcc":     {"Si": "3.940", "C": "2.80"},
-            "random":  {"Si": "1.8",   "C": "1.5"}}
 
 shear = 0.05
 
@@ -93,7 +98,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     ########################################################################
     # Run self-consistency tests, while writing all boxes to a temp dir.   #
     ########################################################################
-    print("Running self-consistency tests...", end="\n",
+    print("Running self-consistency tests...", end=("\n" if args.verbose else " "),
           file=sys.stderr, flush=True)
     start = time.time()
 
@@ -130,6 +135,11 @@ with tempfile.TemporaryDirectory() as tmpdir:
                                           (-shear, 0, shear),
                                           (-shear, 0, shear),
                                           (-shear, 0, shear)))
+    if args.only_fast:
+        # Skip numer_forces_deriv for random boxes: too slow
+        combinations = [i for i in combinations
+                        if not (i[0] == "numer_forces_deriv"
+                                and i[1] == "random")]
     niter = len(combinations)
     last_batch = ()
     for i, combi in enumerate(combinations):
@@ -138,7 +148,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
         repeat = commands[command]
         latconst = lattices[lattice][elem]
         new_batch = (command, lattice, elem)
-        if new_batch != last_batch:
+        if args.verbose and new_batch != last_batch:
             print("    {:5.1f}%  --  {} {} {}".format(100*i/niter, *new_batch),
                   file=sys.stderr)
             last_batch = new_batch

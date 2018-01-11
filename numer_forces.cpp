@@ -149,24 +149,26 @@ double Compute::max_diff_force_fast() {
   // Calculate forces by numerical derivatives.
   for (unsigned i = 0; i < box_->natoms; ++i) {
     for (unsigned dim = 0; dim < 3; ++dim) {
-      double h = 1e-5; // TODO: numerical recipies?   
+      double h = 1e-5;
       Vec3D<double> orig_pos = this->get_position(i);
-      // Forward
+      // Forward ///////////////////////////////////////////////////////
       Vec3D<double> new_pos(orig_pos);
       new_pos[dim] += h;
       this->set_position(i, new_pos);
-      this->update_neighbor_list();
+      // Enough to update ghosts, neighbor list changes are not important.
+      this->box_->update_ghosts(partcl_type_codes);
       this->compute();
       double Ep = this->get_energy();
-      // Backward
+      // Backward //////////////////////////////////////////////////////
       new_pos[dim] = orig_pos[dim] - h;
       this->set_position(i, new_pos);
-      this->update_neighbor_list();
+      this->box_->update_ghosts(partcl_type_codes);
       this->compute();
       double En = this->get_energy();
-      // Reset
+      // Reset /////////////////////////////////////////////////////////
       this->set_position(i, orig_pos);
-      // Eval.
+      this->box_->update_ghosts(partcl_type_codes);
+      // Eval. /////////////////////////////////////////////////////////
       double num_force = -(Ep - En) / (2 * h);
       double diff = abs(the_forces(i, dim) - num_force);
       if (diff > max_diff)
