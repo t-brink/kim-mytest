@@ -1164,8 +1164,21 @@ namespace mytest {
 
         The maximum deviation is for a single dimension of a single
         atom (e.g. atom 12's force in y direction).
+
+        This uses Ridders' method and is slow.
     */
     double max_diff_force();
+
+    /** Derive force numerically from the energy and return maximum
+        deviation from model forces.
+
+        The maximum deviation is for a single dimension of a single
+        atom (e.g. atom 12's force in y direction).
+
+        This uses the central difference method and is fast (but has a
+        larger error).
+    */
+    double max_diff_force_fast();
 
     /** Switch the contained Box objects between two Compute objects.
 

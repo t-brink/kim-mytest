@@ -88,6 +88,8 @@ df_dr(Compute& compute, unsigned i, unsigned dim, double eps) {
 // This guy computes forces numerically by differentiation and
 // compares with the result of the model. Return value: maximum
 // deviation.
+//
+// This uses Ridders' method and is fucking slow.
 double Compute::max_diff_force() {
   double max_diff = 0.0;
   // Calculate forces by model.
@@ -127,3 +129,49 @@ double Compute::max_diff_force() {
   return max_diff;
 }
 
+
+// This guy computes forces numerically by differentiation and
+// compares with the result of the model. Return value: maximum
+// deviation.
+//
+// This uses the central difference method and is much faster. It has
+// a larger error, though.
+double Compute::max_diff_force_fast() {
+  double max_diff = 0.0;
+  // Calculate forces by model.
+  Array2D<double> the_forces(box_->natoms, 3);
+  this->compute();
+  for (unsigned i = 0; i < box_->natoms; ++i) {
+    for (unsigned dim = 0; dim < 3; ++dim) {
+      the_forces(i, dim) = forces[3*i + dim];
+    }
+  }
+  // Calculate forces by numerical derivatives.
+  for (unsigned i = 0; i < box_->natoms; ++i) {
+    for (unsigned dim = 0; dim < 3; ++dim) {
+      double h = 1e-5; // TODO: numerical recipies?   
+      Vec3D<double> orig_pos = this->get_position(i);
+      // Forward
+      Vec3D<double> new_pos(orig_pos);
+      new_pos[dim] += h;
+      this->set_position(i, new_pos);
+      this->update_neighbor_list();
+      this->compute();
+      double Ep = this->get_energy();
+      // Backward
+      new_pos[dim] = orig_pos[dim] - h;
+      this->set_position(i, new_pos);
+      this->update_neighbor_list();
+      this->compute();
+      double En = this->get_energy();
+      // Reset
+      this->set_position(i, orig_pos);
+      // Eval.
+      double num_force = -(Ep - En) / (2 * h);
+      double diff = abs(the_forces(i, dim) - num_force);
+      if (diff > max_diff)
+        max_diff = diff;
+    }
+  }
+  return max_diff;
+}

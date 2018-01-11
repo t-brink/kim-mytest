@@ -93,7 +93,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     ########################################################################
     # Run self-consistency tests, while writing all boxes to a temp dir.   #
     ########################################################################
-    print("Running self-consistency tests...", end=" ",
+    print("Running self-consistency tests...", end="\n",
           file=sys.stderr, flush=True)
     start = time.time()
 
@@ -118,20 +118,32 @@ with tempfile.TemporaryDirectory() as tmpdir:
             ))
 
     firstrun = True
-    for i in itertools.product(sorted(commands),
-                               sorted(lattices),
-                               sorted(elements),
-                               (True, False), (True, False), (True, False),
-                               (True, False), (True, False),
-                               (-shear, 0, shear),
-                               (-shear, 0, shear),
-                               (-shear, 0, shear)):
+    combinations = list(itertools.product(sorted(commands),
+                                          sorted(lattices),
+                                          sorted(elements),
+                                          # PBC
+                                          (True, False),
+                                          (True, False),
+                                          (True, False),
+                                          # Cubic        del atom?
+                                          (True, False), (True, False),
+                                          (-shear, 0, shear),
+                                          (-shear, 0, shear),
+                                          (-shear, 0, shear)))
+    niter = len(combinations)
+    last_batch = ()
+    for i, combi in enumerate(combinations):
         (command, lattice, elem, pbc_x, pbc_y, pbc_z, cubic,
-         del_atom, shear_yz, shear_xz, shear_xy) = i
+         del_atom, shear_yz, shear_xz, shear_xy) = combi
         repeat = commands[command]
         latconst = lattices[lattice][elem]
+        new_batch = (command, lattice, elem)
+        if new_batch != last_batch:
+            print("    {:5.1f}%  --  {} {} {}".format(100*i/niter, *new_batch),
+                  file=sys.stderr)
+            last_batch = new_batch
         # Create the box.
-        h_i = hash(i)
+        h_i = hash(combi)
         boxname = "box-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
         if lattice == "random":
             randboxname = rand_boxes[(elem, pbc_x, pbc_y, pbc_z)]
@@ -176,6 +188,9 @@ with tempfile.TemporaryDirectory() as tmpdir:
                 )
             )
         # Compute.
+        if command == "numer_forces_deriv" and lattice == "random":
+            # This is too slow, so use the fast (but inexact) version
+            command = "numer_forces_deriv_fast"
         ex("{} comp".format(command))
 
     proc.stdin.close()

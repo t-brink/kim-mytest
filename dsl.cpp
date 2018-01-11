@@ -619,6 +619,27 @@ void mytest::parse(string command,
       printf("\n");
     }
     */
+  } else if (tokens[0] == "numer_forces_deriv_fast") {
+    if (tokens.size() != 2) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    double max_diff_force = 666;
+    try {
+      max_diff_force = iter->second.max_diff_force_fast();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    cout << "Maximum force deviation: " << max_diff_force;
+    if (abs(max_diff_force) > 1e-5)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
   } else if (tokens[0] == "diff_total_energy_vs_particle_energy") {
     if (tokens.size() != 2) {
       cout << "Wrong number of arguments." << endl;
