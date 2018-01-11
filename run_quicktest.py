@@ -36,7 +36,7 @@ pair_style tersoff
 pair_coeff * * {} {}
 """.format(lammps_potfile, " ".join(elements))
 
-lammps_cmd = ["/nfshome/brink/PhD/KIM/lmp_serial"]
+lammps_cmd = ["/home/brink/bin/lmp_serial"]
 
 lattices = {#"diamond": {"Si": "5.429", "C": "3.85"},
             #"sc":      {"Si": "2.525", "C": "1.80"},

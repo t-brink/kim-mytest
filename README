@@ -1,0 +1,4 @@
+A simple program to use and test models from the KIM project.
+
+The Makefile assumes that nlopt (https://nlopt.readthedocs.io/) and its
+headers are installed in standard system paths.
