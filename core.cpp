@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2014,2017 Tobias Brink
+  Copyright (c) 2013,2014,2017,2018 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -1298,6 +1298,49 @@ void Compute::set_parameter(const string& param_name,
                             int value, bool reinit) {
   // TODO: check if this uses the correct type.     
   set_parameter_impl<int>(param_name, indices, value, reinit);
+}
+
+
+template<typename T>
+T Compute::get_parameter_impl(const string& param_name,
+                              const vector<unsigned>& indices) {
+  // Get parameter data.
+  const auto it = free_parameter_map.find(param_name);
+  if (it == free_parameter_map.end())
+    throw runtime_error("Unknown free parameter: " + param_name);
+  const FreeParam& param = it->second;
+  // Check rank.
+  if (indices.size() != param.rank)
+    throw runtime_error("Rank of indices ("
+                        + to_string(indices.size())
+                        + ") doesn't match rank of parameter ("
+                        + to_string(param.rank) + ")");
+  // Get it.
+  int status;
+  T* p = (T*)model->get_data_by_index(param.kim_index, &status);
+  if (status < KIM_STATUS_OK)
+    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+                        + string(" of file ") + string(__FILE__));
+  unsigned index = 0;
+  for (unsigned k = 0; k != param.rank; ++k) {
+    unsigned product = 1;
+    for (unsigned l = k + 1; l != param.rank; ++l)
+      product *= param.shape[l];
+    index += product * indices[k];
+  }
+  return p[index];
+}
+
+int Compute::get_parameter_int(const string& param_name,
+                               const vector<unsigned>& indices) {
+  // TODO: check if this uses the correct type.     
+  return get_parameter_impl<int>(param_name, indices);
+}
+
+double Compute::get_parameter_double(const string& param_name,
+                                     const vector<unsigned>& indices) {
+  // TODO: check if this uses the correct type.     
+  return get_parameter_impl<double>(param_name, indices);
 }
 
 

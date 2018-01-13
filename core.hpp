@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2017 Tobias Brink
+  Copyright (c) 2013,2017,2018 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -635,6 +635,11 @@ namespace mytest {
         throw std::runtime_error("unknown type name");
     }
 
+    /** Get number of particle types. */
+    unsigned get_number_of_particle_types() {
+      return partcl_type_codes.size();
+    }
+
     /** Return number of atoms in the simulation box. */
     unsigned get_natoms() const {
       return box_->natoms;
@@ -861,6 +866,12 @@ namespace mytest {
     void set_parameter(const std::string& param_name,
                        const std::vector<unsigned>& indices,
                        double value, bool reinit = true);
+
+    int get_parameter_int(const std::string& param_name,
+                          const std::vector<unsigned>& indices);
+
+    double get_parameter_double(const std::string& param_name,
+                                const std::vector<unsigned>& indices);
 
     /** Change model parameter.
 
@@ -1299,6 +1310,11 @@ namespace mytest {
     void set_parameter_impl(const std::string& param_name,
                             const std::vector<unsigned>& indices,
                             T value, bool reinit);
+
+    /** get_parameter() implementation. */
+    template<typename T>
+    T get_parameter_impl(const std::string& param_name,
+                         const std::vector<unsigned>& indices);
 
     /** What it says on the tin. */
     void update_kim_after_box_change();
