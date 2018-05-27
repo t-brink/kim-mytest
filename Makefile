@@ -33,13 +33,16 @@ LDLIBS=$(shell $(KIMCFG) --ldlibs)
 
 PWD=$(shell pwd)
 
-all: mytest
+all: mytest test_switch_params
 
 clean:
 	rm -f mytest *.o
 
 mytest: core.o elastic.o dsl.o mytest.o numer_forces.o poisson_disk_sampling.o
 	$(LD) $(LDFLAGS) -std=c++11 -o mytest mytest.o core.o elastic.o dsl.o numer_forces.o poisson_disk_sampling.o $(LDLIBS) -lnlopt
+
+test_switch_params: core.o elastic.o dsl.o test_switch_params.o numer_forces.o poisson_disk_sampling.o
+	$(LD) $(LDFLAGS) -std=c++11 -o test_switch_params test_switch_params.o core.o elastic.o dsl.o numer_forces.o poisson_disk_sampling.o $(LDLIBS) -lnlopt
 
 core.o: core.cpp core.hpp
 	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o core.o -c core.cpp
@@ -58,3 +61,6 @@ numer_forces.o: numer_forces.cpp
 
 poisson_disk_sampling.o: poisson_disk_sampling.cpp
 	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o poisson_disk_sampling.o poisson_disk_sampling.cpp
+
+test_switch_params.o: test_switch_params.cpp
+	$(CXX) $(CXXFLAGS) -std=c++11 $(INCLUDES) $(KIMINCLUDES) -c -o test_switch_params.o test_switch_params.cpp
