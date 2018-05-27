@@ -36,7 +36,7 @@ PWD=$(shell pwd)
 all: mytest test_switch_params
 
 clean:
-	rm -f mytest *.o
+	rm -f mytest test_switch_params *.o
 
 mytest: core.o elastic.o dsl.o mytest.o numer_forces.o poisson_disk_sampling.o
 	$(LD) $(LDFLAGS) -std=c++11 -o mytest mytest.o core.o elastic.o dsl.o numer_forces.o poisson_disk_sampling.o $(LDLIBS) -lnlopt
