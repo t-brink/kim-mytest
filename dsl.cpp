@@ -365,8 +365,8 @@ void mytest::parse(string command,
     // Output.
     cout << comment << endl;
     bool has_err = (abs(max_err_energy) > 1e-5)
-                || (abs(max_err_force) > 1e-5)
-                || (abs(max_err_stress) > 1e-4);
+                || (abs(max_err_force) > 1e-5);
+    bool has_err_stress = abs(max_err_stress) > 1e-4;
     cout << "Maximum particle energy deviation: " << max_err_energy;
     if (has_err)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
@@ -378,7 +378,7 @@ void mytest::parse(string command,
     cout << endl;
     //
     cout << "Maximum particle virial deviation: " << max_err_stress;
-    if (has_err)
+    if (has_err_stress)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
     cout << endl;
     //

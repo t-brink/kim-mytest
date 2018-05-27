@@ -1243,6 +1243,7 @@ namespace mytest {
     bool has_particleEnergy;
     bool has_virial;
     bool has_particleVirial;
+    bool has_process_dEdr;
     // Model input.
     int ntypes;
     // Model output (constant).

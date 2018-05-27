@@ -861,7 +861,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
 
   // Assemble KIM descriptor file.
   string descriptor =
-    "KIM_API_Version  := 1.6.0\n"
+    "KIM_API_Version  := 1.9.0\n"
     "\n"
     "Unit_length      := A\n"
     "Unit_energy      := eV\n"
@@ -944,6 +944,14 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   has_virial = (status == KIM_STATUS_OK);
   query->get_index("particleVirial", &status);
   has_particleVirial = (status == KIM_STATUS_OK);
+  query->get_index("process_dEdr", &status);
+  has_process_dEdr = (status == KIM_STATUS_OK);
+
+  if (has_process_dEdr) {
+    // we can always compute the virial with this
+    has_virial = true;
+    has_particleVirial = true;
+  }
 
   descriptor +=
     "\n"
