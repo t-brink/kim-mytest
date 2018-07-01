@@ -370,11 +370,15 @@ void mytest::parse(string command,
     cout << "Maximum particle energy deviation: " << max_err_energy;
     if (has_err)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    else if (has_err_stress)
+      cout << "     !!!"; // just for grepping
     cout << endl;
     //
     cout << "Maximum force deviation: " << max_err_force;
     if (has_err)
       cout << "               !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    else if (has_err_stress)
+      cout << "     !!!"; // just for grepping
     cout << endl;
     //
     cout << "Maximum particle virial deviation: " << max_err_stress;
