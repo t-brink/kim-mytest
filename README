@@ -2,3 +2,174 @@ A simple program to use and test models from the KIM project.
 
 The Makefile assumes that nlopt (https://nlopt.readthedocs.io/) and its
 headers are installed in standard system paths.
+
+************************************************************************
+
+Commands that are read by the main program's command line:
+
+box
+===
+
+box <name>
+    <lattice> <lattice constant> <cubic box?>
+    <repeat a> <repeat b> <repeat c>
+    <periodic a?> <periodic b?> <periodic c?>
+    <atom type> [<atom type> ...]
+
+Create a new box with a given pre-defined lattice. Options with a
+question mark are booleans (true/false).
+
+
+random_box
+==========
+
+random_box <name>
+           <periodic a?> <periodic b?> <periodic c?>
+           <minimum distance between atoms>
+           <atom type>
+
+Create a 10x10x10 box randomly filled with atoms with a minimum
+distance between them.
+
+
+copy_box
+========
+
+copy_box <src> <dst>
+
+Copy a box named <src> and name the copy <dst>.
+
+
+delete_atom
+===========
+
+delete_atom <box name> [<i>]
+
+Delete atom <i> from the given box. If <i> is not provided, delete a
+random atom.
+
+
+model
+=====
+
+model <name> <box name> <KIM model name>
+
+Init a KIM model (wrapper). Needs an existing box.
+
+
+change_box
+==========
+
+change_box <model name> <box name>
+
+Associate the given box to the given model.
+
+
+switch_boxes
+============
+
+Not implemented.
+
+
+deform_box
+==========
+
+deform_box <model name> <Dxx> <Dyy> <Dzz> <Dyz> <Dxz> <Dxy>
+
+Deform the box registered with the provided model. The values are the
+deformation matrix in Voigt notation, where the deformation matrix is
+defined as the sum of the strain matrix ε and the identity matrix I.
+
+
+write_box
+=========
+
+write_box <box name> <file name>
+
+Write the given box to a file in extended XYZ format.
+
+
+compute
+=======
+
+compute <model name>
+
+Compute and store values for the given model using its currently
+associated box.
+
+
+check_testfile
+==============
+
+TODO   
+
+
+optimize_positions
+==============
+
+TODO   
+
+
+bulk_modulus_energy
+==============
+
+TODO   
+
+
+bulk_modulus_pressure
+==============
+
+TODO   
+
+
+stiffness_tensor
+==============
+
+TODO   
+
+
+numer_forces_deriv
+==============
+
+TODO   
+
+
+numer_forces_deriv_fast
+==============
+
+TODO   
+
+
+diff_total_energy_vs_particle_energy
+==============
+
+TODO   
+
+
+diff_total_virial_vs_particle_virial
+==============
+
+TODO   
+
+
+diff_total_virial_vs_virial_from_forces
+==============
+
+TODO   
+
+
+print
+=====
+
+print <msg>
+
+Print <msg> to screen. Here, <msg> is everything after "print "
+(including one space) up to the next newline character (excluded).
+
+
+println
+=======
+
+println <msg>
+
+Like "print", but also print a newline.

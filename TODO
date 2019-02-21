@@ -1,3 +1,21 @@
+* KIM v2
+
+** Remove obsolete neighbor modes [DONE]
+
+** Port to cmake
+
+** adapt core.?pp
+
+** check if other files need changes
+
+** document DSL [started]
+
+** adapt run_tests.py for DSL changes (no neighbor mode any more) [DONE]
+
+** run tests
+
+
+
 * TESTS
 
 ** the bash scripts should probably go into the C++ code???

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2017 Tobias Brink
+  Copyright (c) 2017,2019 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -207,7 +207,6 @@ std::unique_ptr<Box> Box::random_box(double a, double b, double c,
                                      bool periodic_c,
                                      double min_dist,
                                      const std::string& atomtype,
-                                     KIMNeigh neighmode,
                                      const std::string& name,
                                      std::mt19937& rng) {
   vector<double> positions;
@@ -226,5 +225,5 @@ std::unique_ptr<Box> Box::random_box(double a, double b, double c,
                           Vec3D<double>(0, 0, c),
                           periodic_a, periodic_b, periodic_c,
                           move(coords), move(types),
-                          neighmode, name);
+                          name);
 }

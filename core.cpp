@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2014,2017,2018 Tobias Brink
+  Copyright (c) 2013,2014,2017,2018,2019 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -46,11 +46,10 @@ Box::Box(const Vec3D<double>& a_in,
          bool periodic_a, bool periodic_b, bool periodic_c,
          unique_ptr< Array2D<double> > coordinates,
          unique_ptr< Array1DInit<string> > types_in,
-         KIMNeigh neighmode, const string& name)
+         const string& name)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
     periodic(periodic_),
-    kim_neighbor_mode(neighmode),
     natoms(natoms_), nghosts(nghosts_), nall(nall_),
     positions(move(*coordinates)), // Public data.
     types(move(*types_in)),
@@ -59,34 +58,23 @@ Box::Box(const Vec3D<double>& a_in,
     periodic_(periodic_a, periodic_b, periodic_c),
     natoms_(coordinates->extent(0)), nghosts_(0), nall_(natoms_),
     name_(name),
-    neigh_list_(neighmode != KIM_cluster ? natoms_ : 0),
-    neigh_rvec_(neighmode == KIM_neigh_rvec_f ? natoms_ : 0),
-    neigh_rvec_shell_(neighmode == KIM_neigh_rvec_f ? natoms_ : 0)
+    neigh_list_(natoms_)
 {
   if (positions.extent(0) != types.extent(0))
     throw runtime_error("types must have the same length as the "
                         "first dimension of positions.");
   if (positions.extent(1) != 3)
     throw runtime_error("positions must be a n*3 array.");
-
-  if (neighmode == KIM_mi_opbc_f
-      && (!periodic_[0] || !periodic_[1] || !periodic_[2]
-          || abs(a_in[1]) > DELTA || abs(a_in[2]) > DELTA
-          || abs(b_in[0]) > DELTA || abs(b_in[2]) > DELTA
-          || abs(c_in[0]) > DELTA || abs(c_in[1]) > DELTA))
-      throw runtime_error("for MI_OPBC_F all dimensions must be periodic "
-                          "and the box must be orthorhombic.");
 }
 
 Box::Box(const std::string& lattice, double lattice_const, bool cubic,
          unsigned repeat_a, unsigned repeat_b, unsigned repeat_c,
          bool periodic_a, bool periodic_b, bool periodic_c,
          const vector<string>& types_in,
-         KIMNeigh neighmode, const std::string& name)
+         const std::string& name)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
     periodic(periodic_),
-    kim_neighbor_mode(neighmode),
     natoms(natoms_), nghosts(nghosts_), nall(nall_),
     positions(atoms_per_unit_cell(lattice, cubic) // Public data.
               * repeat_a * repeat_b * repeat_c, 3),
@@ -265,13 +253,6 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
   a_ = double(repeat_a) * unit_a; box_side_lengths_[0] = a_.abs();
   b_ = double(repeat_b) * unit_b; box_side_lengths_[1] = b_.abs();
   c_ = double(repeat_c) * unit_c; box_side_lengths_[2] = c_.abs();
-  if (neighmode == KIM_mi_opbc_f
-      && (!periodic_[0] || !periodic_[1] || !periodic_[2]
-          || abs(a_[1]) > DELTA || abs(a_[2]) > DELTA
-          || abs(b_[0]) > DELTA || abs(b_[2]) > DELTA
-          || abs(c_[0]) > DELTA || abs(c_[1]) > DELTA))
-      throw runtime_error("for MI_OPBC_F all dimensions must be periodic "
-                          "and the box must be orthorhombic.");
   // Fill atoms.
   unsigned i = 0;
   for (unsigned aa = 0; aa != repeat_a; ++aa)
@@ -292,19 +273,13 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
     throw runtime_error("BUG in the implementation, not all atoms are filled.");
 
   // Reserve neighbor list space.
-  if (neighmode != KIM_cluster)
-    neigh_list_.resize(natoms_);
-  if (neighmode == KIM_neigh_rvec_f) {
-    neigh_rvec_.resize(natoms_);
-    neigh_rvec_shell_.resize(natoms_);
-  }
+  neigh_list_.resize(natoms_);
 }
 
 Box::Box(const Box& other, const std::string& new_name)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
     periodic(periodic_),
-    kim_neighbor_mode(other.kim_neighbor_mode),
     natoms(natoms_), nghosts(nghosts_), nall(nall_),
     positions(other.positions.extent(0), // Public data.
               other.positions.extent(1)),
@@ -321,9 +296,7 @@ Box::Box(const Box& other, const std::string& new_name)
                                     other.ghost_positions->extent(1))),
     ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
     */
-    neigh_list_(other.neigh_list_),
-    neigh_rvec_(other.neigh_rvec_),
-    neigh_rvec_shell_(other.neigh_rvec_shell_)
+    neigh_list_(other.neigh_list_)
 {
   for (int i = 0; i != positions.extent(0); ++i)
     for (int j = 0; j != positions.extent(1); ++j)
@@ -346,7 +319,6 @@ Box::Box(const Box& other)
   : box_side_lengths(box_side_lengths_), // Public const references.
     a(a_), b(b_), c(c_),
     periodic(periodic_),
-    kim_neighbor_mode(other.kim_neighbor_mode),
     natoms(natoms_), nghosts(nghosts_), nall(nall_),
     positions(other.positions.extent(0), // Public data.
               other.positions.extent(1)),
@@ -363,9 +335,7 @@ Box::Box(const Box& other)
                                     other.ghost_positions->extent(1))),
     ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
     */
-    neigh_list_(other.neigh_list_),
-    neigh_rvec_(other.neigh_rvec_),
-    neigh_rvec_shell_(other.neigh_rvec_shell_)
+    neigh_list_(other.neigh_list_)
 {
   for (int i = 0; i != positions.extent(0); ++i)
     for (int j = 0; j != positions.extent(1); ++j)
@@ -389,34 +359,12 @@ Box::Box(const Box& other)
 bool Box::update_neighbor_list(double cutoff, double skin,
                                const map<string,int>& typemap) {
   const double cut = (1 + skin) * cutoff;
-  if (kim_neighbor_mode == KIM_mi_opbc_f
-      && (cut > 0.5 * box_side_lengths_[0]
-          || cut > 0.5 * box_side_lengths_[1]
-          || cut > 0.5 * box_side_lengths_[2]))
-    throw runtime_error("Cutoff too big. When using MI_OPBC_F the cutoff "
-                        "must be smaller than half the smallest box side "
-                        "length.");
   ghost_shells = calc_number_of_ghost_shells(cut);
-  Vec3D<unsigned> tmp_shells = ghost_shells;
   unsigned new_nghosts;
-  switch (kim_neighbor_mode) {
-  case KIM_cluster:
-  case KIM_mi_opbc_f:
-  case KIM_neigh_pure_f:
-    // For these we store any ghost atoms that we may need.
-    new_nghosts = natoms_ * ((2*ghost_shells[0]+1)
-                             * (2*ghost_shells[1]+1)
-                             * (2*ghost_shells[2]+1) - 1);
-    break;
-  case KIM_neigh_rvec_f:
-    // Here the ghost atoms are only needed during neighbor list
-    // calculation and are not stored.
-    new_nghosts = 0;
-    ghost_shells[0] = 0; ghost_shells[1] = 0; ghost_shells[2] = 0;
-    break;
-  default:
-    throw runtime_error("unsupported neighbor list mode.");
-  }
+  // We store any ghost atoms that we may need.
+  new_nghosts = natoms_ * ((2*ghost_shells[0]+1)
+                           * (2*ghost_shells[1]+1)
+                           * (2*ghost_shells[2]+1) - 1);
   // If needed, resize ghost arrays. If the arrays are not yet
   // allocated, allocate them (ghost_position == nullptr).
   bool reallocated = false;
@@ -435,146 +383,42 @@ bool Box::update_neighbor_list(double cutoff, double skin,
   // Clear neighbor lists.
   for (auto& l : neigh_list_)
     l.clear();
-  for (auto& l : neigh_rvec_)
-    l.clear();
 
   // Fill neighbor lists again.
-  switch(kim_neighbor_mode) {
-  case KIM_cluster:
-    break;
-  case KIM_mi_opbc_f:
-    {
-      const double cutsq = cut * cut;
-      for (unsigned i = 0; i != natoms_; ++i) {
-        // Go over neighbors in the central cell.
-        for (unsigned j = i+1; j != natoms_; ++j) {
-          // Get distance vector.
-          double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
-          if (abs(dx) > 0.5 * box_side_lengths_[0])
-            dx -= (dx / abs(dx)) * box_side_lengths_[0];
-          double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
-          if (abs(dy) > 0.5 * box_side_lengths_[1])
-            dy -= (dy / abs(dy)) * box_side_lengths_[1];
-          double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
-          if (abs(dz) > 0.5 * box_side_lengths_[2])
-            dz -= (dz / abs(dz)) * box_side_lengths_[2];
-          // Check cutoff.
-          if (dx*dx + dy*dy + dz*dz < cutsq) {
-            neigh_list_[i].push_back(j);
-            neigh_list_[j].push_back(i);
-          }
-        }
+  const double cutsq = cut * cut;
+  for (unsigned i = 0; i != natoms_; ++i) {
+    // Go over neighbors in the central cell.
+    for (unsigned j = i+1; j != natoms_; ++j) {
+      const double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
+      const double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
+      const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
+      if (dx*dx + dy*dy + dz*dz < cutsq) {
+        neigh_list_[i].push_back(j);
+        neigh_list_[j].push_back(i);
       }
     }
-    break;
-  case KIM_neigh_pure_f:
-    {
-      // Fill neighbor lists again.
-      const double cutsq = cut * cut;
-      for (unsigned i = 0; i != natoms_; ++i) {
-        // Go over neighbors in the central cell.
-        for (unsigned j = i+1; j != natoms_; ++j) {
-          const double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
-          const double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
-          const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
-          if (dx*dx + dy*dy + dz*dz < cutsq) {
-            neigh_list_[i].push_back(j);
-            neigh_list_[j].push_back(i);
-          }
-        }
-        // Iterate over ghosts.
-        for (unsigned j = natoms_; j != nall_; ++j) {
-          const double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
-          const double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
-          const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
-          if (dx*dx + dy*dy + dz*dz < cutsq) {
-            neigh_list_[i].push_back(j);
-          }
-        }
+    // Iterate over ghosts.
+    for (unsigned j = natoms_; j != nall_; ++j) {
+      const double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
+      const double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
+      const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
+      if (dx*dx + dy*dy + dz*dz < cutsq) {
+        neigh_list_[i].push_back(j);
       }
     }
-    break;
-  case KIM_neigh_rvec_f:
-    {
-      // Fill neighbor lists again.
-      const double cutsq = cut * cut;
-      for (unsigned i = 0; i != natoms_; ++i) {
-        // Go over neighbors in the central cell.
-        for (unsigned j = i+1; j != natoms_; ++j) {
-          const double dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
-          const double dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
-          const double dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
-          if (dx*dx + dy*dy + dz*dz < cutsq) {
-            neigh_list_[i].push_back(j);
-            neigh_list_[j].push_back(i);
-            neigh_rvec_[i].push_back(dx);
-            neigh_rvec_[i].push_back(dy);
-            neigh_rvec_[i].push_back(dz);
-            neigh_rvec_[j].push_back(-dx);
-            neigh_rvec_[j].push_back(-dy);
-            neigh_rvec_[j].push_back(-dz);
-            neigh_rvec_shell_[i].push_back(Vec3D<int>(0,0,0));
-            neigh_rvec_shell_[j].push_back(Vec3D<int>(0,0,0));
-          }
-        }
-        // Iterate over ghosts.
-        const int alo = -static_cast<int>(tmp_shells[0]);
-        const int ahi = tmp_shells[0];
-        const int blo = -static_cast<int>(tmp_shells[1]);
-        const int bhi = tmp_shells[1];
-        const int clo = -static_cast<int>(tmp_shells[2]);
-        const int chi = tmp_shells[2];
-        for (int aa = alo; aa <= ahi; ++aa)
-          for (int bb = blo; bb <= bhi; ++bb)
-            for (int cc = clo; cc <= chi; ++cc) {
-              if (aa == 0 && bb == 0 && cc == 0) continue;
-              const Vec3D<double> offset =
-                double(aa)*a + double(bb)*b + double(cc)*c;
-              for (unsigned j = 0; j != natoms_; ++j) {
-                const double dx =
-                  (*ghost_positions)(j,0) - (*ghost_positions)(i,0) + offset[0];
-                const double dy =
-                  (*ghost_positions)(j,1) - (*ghost_positions)(i,1) + offset[1];
-                const double dz =
-                  (*ghost_positions)(j,2) - (*ghost_positions)(i,2) + offset[2];
-                if (dx*dx + dy*dy + dz*dz < cutsq) {
-                  neigh_list_[i].push_back(j);
-                  neigh_rvec_[i].push_back(dx);
-                  neigh_rvec_[i].push_back(dy);
-                  neigh_rvec_[i].push_back(dz);
-                  neigh_rvec_shell_[i].push_back(Vec3D<int>(aa,bb,cc));
-                }
-              }
-            }
-      }
-    }
-    break;
-  default:
-    throw runtime_error("unsupported neighbor list mode.");
   }
 
   return reallocated;
 }
 
 void Box::update_ghosts(const map<string,int>& typemap) {
-  // Copy original atoms, enforcing periodic boundaries if the
-  // neighbor mode is MI_OPBC_F.
-  if (kim_neighbor_mode == KIM_mi_opbc_f)
-    // Box is orthorhombic and periodic in all directions.
-    for (unsigned i = 0; i != natoms_; ++i) {
-      (*ghost_positions)(i, 0) = pmod(positions(i, 0), box_side_lengths_[0]);
-      (*ghost_positions)(i, 1) = pmod(positions(i, 1), box_side_lengths_[1]);
-      (*ghost_positions)(i, 2) = pmod(positions(i, 2), box_side_lengths_[2]);
-      (*ghost_types)(i) = typemap.at(types(i));
-    }
-  else
-    // Just assign without wrapping.
-    for (unsigned i = 0; i != natoms_; ++i) {
-      (*ghost_positions)(i, 0) = positions(i, 0);
-      (*ghost_positions)(i, 1) = positions(i, 1);
-      (*ghost_positions)(i, 2) = positions(i, 2);
-      (*ghost_types)(i) = typemap.at(types(i));
-    }
+  // Copy original atoms, do not wrap for PBCs.
+  for (unsigned i = 0; i != natoms_; ++i) {
+    (*ghost_positions)(i, 0) = positions(i, 0);
+    (*ghost_positions)(i, 1) = positions(i, 1);
+    (*ghost_positions)(i, 2) = positions(i, 2);
+    (*ghost_types)(i) = typemap.at(types(i));
+  }
   unsigned ii = natoms_;
   const int alo = -static_cast<int>(ghost_shells[0]);
   const int ahi = ghost_shells[0];
@@ -596,37 +440,6 @@ void Box::update_ghosts(const map<string,int>& typemap) {
           ++ii;
         }
       }
-}
-
-
-void Box::update_ghost_rvecs(const map<string,int>& typemap) {
-  update_ghosts(typemap);
-  if (kim_neighbor_mode == KIM_neigh_rvec_f) {
-    for (unsigned i = 0; i != natoms_; ++i) {
-      const unsigned jjmax = neigh_list_[i].size();
-      const auto& neigh_i = neigh_list_[i];
-      auto& rvec_i = neigh_rvec_[i];
-      const auto& shells_i = neigh_rvec_shell_[i];
-      for (unsigned jj = 0; jj != jjmax; ++jj) {
-        const unsigned j = neigh_i[jj];
-        const Vec3D<double> offset(shells_i[jj][0] * a[0]
-                                   + shells_i[jj][1] * b[0]
-                                   + shells_i[jj][2] * c[0],
-                                   shells_i[jj][0] * a[1]
-                                   + shells_i[jj][1] * b[1]
-                                   + shells_i[jj][2] * c[1],
-                                   shells_i[jj][0] * a[2]
-                                   + shells_i[jj][1] * b[2]
-                                   + shells_i[jj][2] * c[2]);
-        rvec_i[jj*3 + 0] =
-          (*ghost_positions)(j,0) - (*ghost_positions)(i,0) + offset[0];
-        rvec_i[jj*3 + 1] =
-          (*ghost_positions)(j,1) - (*ghost_positions)(i,1) + offset[1];
-        rvec_i[jj*3 + 2] =
-          (*ghost_positions)(j,2) - (*ghost_positions)(i,2) + offset[2];
-      }
-    }
-  }
 }
 
 
@@ -652,7 +465,7 @@ unique_ptr<Box> Box::delete_atom(unsigned i, const string& name) {
   }
   return make_unique<Box>(a, b, c, periodic[0], periodic[1], periodic[2],
                           move(new_positions), move(new_types),
-                          kim_neighbor_mode, name_);
+                          name_);
 }
 
 
@@ -663,14 +476,6 @@ double Box::calc_dist(int i, int j, double& dx, double& dy, double& dz) const {
   dx = (*ghost_positions)(j,0) - (*ghost_positions)(i,0);
   dy = (*ghost_positions)(j,1) - (*ghost_positions)(i,1);
   dz = (*ghost_positions)(j,2) - (*ghost_positions)(i,2);
-  if (kim_neighbor_mode == KIM_mi_opbc_f) {
-    if (abs(dx) > 0.5 * box_side_lengths_[0])
-      dx -= (dx / abs(dx)) * box_side_lengths_[0];
-    if (abs(dy) > 0.5 * box_side_lengths_[1])
-      dy -= (dy / abs(dy)) * box_side_lengths_[1];
-    if (abs(dz) > 0.5 * box_side_lengths_[2])
-      dz -= (dz / abs(dz)) * box_side_lengths_[2];
-  }
   return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
@@ -726,19 +531,12 @@ void Box::scale(double factor_a, double factor_b, double factor_c,
   }
 
   // Update ghosts etc.
-  update_ghost_rvecs(typemap);
+  update_ghosts(typemap);
 }
 
 
 void Box::deform(Voigt6<double> defmatrix,
                  const map<string,int>& typemap) {
-  // Check MI_OPBC_F constraints.
-  if (kim_neighbor_mode == KIM_mi_opbc_f
-      && (abs(defmatrix(3)) > DELTA
-          || abs(defmatrix(4)) > DELTA
-          || abs(defmatrix(5)) > DELTA))
-    throw runtime_error("cannot shear box with MI_OPBC_F neighbor list.");
-
   // Throw away very small shear.
   if (abs(defmatrix(3)) < DELTA)
     defmatrix(3) = 0.0;
@@ -775,7 +573,7 @@ void Box::deform(Voigt6<double> defmatrix,
   }
 
   // Update ghosts etc.
-  update_ghost_rvecs(typemap);
+  update_ghosts(typemap);
 }
 
 
@@ -821,29 +619,16 @@ unsigned Box::species_per_unit_cell(const string& lattice) {
 }
 
 Vec3D<unsigned> Box::calc_number_of_ghost_shells(double cutoff) const {
-  switch (kim_neighbor_mode) {
-  case KIM_mi_opbc_f:
-    // No ghost atoms needed.
-    return Vec3D<unsigned>(0, 0, 0);
-  case KIM_cluster:
-  case KIM_neigh_pure_f:
-  case KIM_neigh_rvec_f:
-    {
-      const Vec3D<double> bc = cross(b_, c_);
-      const Vec3D<double> ac = cross(a_, c_);
-      const Vec3D<double> ab = cross(a_, b_);
-      const double V = abs(dot(a_, bc));
-      const double da = V / bc.abs();
-      const double db = V / ac.abs();
-      const double dc = V / ab.abs();
-      return Vec3D<unsigned>(periodic_[0] ? ceil(cutoff/da) : 0,
-                             periodic_[1] ? ceil(cutoff/db) : 0,
-                             periodic_[2] ? ceil(cutoff/dc) : 0);
-    }
-    break;
-  default:
-    throw runtime_error("unknown neighbor list mode.");
-  }
+  const Vec3D<double> bc = cross(b_, c_);
+  const Vec3D<double> ac = cross(a_, c_);
+  const Vec3D<double> ab = cross(a_, b_);
+  const double V = abs(dot(a_, bc));
+  const double da = V / bc.abs();
+  const double db = V / ac.abs();
+  const double dc = V / ab.abs();
+  return Vec3D<unsigned>(periodic_[0] ? ceil(cutoff/da) : 0,
+                         periodic_[1] ? ceil(cutoff/db) : 0,
+                         periodic_[2] ? ceil(cutoff/dc) : 0);
 }
 
 
@@ -854,8 +639,7 @@ Vec3D<unsigned> Box::calc_number_of_ghost_shells(double cutoff) const {
 
 
 Compute::Compute(unique_ptr<Box> box, const string& modelname)
-  : box_(move(box)), modelname_(modelname),
-    neighbor_mode(box_->kim_neighbor_mode)
+  : box_(move(box)), modelname_(modelname)
 {
   int status;
 
@@ -871,26 +655,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
     "\n"
     "ZeroBasedLists    flag\n"
     "Neigh_BothAccess  flag\n";
-  switch (neighbor_mode) {
-  case KIM_cluster:
-    descriptor += "CLUSTER           flag\n";
-    kim_wants_rvec = false;
-    break;
-  case KIM_mi_opbc_f:
-    descriptor += "MI_OPBC_F         flag\n";
-    kim_wants_rvec = false;
-    break;
-  case KIM_neigh_pure_f:
-    descriptor += "NEIGH_PURE_F      flag\n";
-    kim_wants_rvec = false;
-    break;
-  case KIM_neigh_rvec_f:
-    descriptor += "NEIGH_RVEC_F      flag\n";
-    kim_wants_rvec = true;
-    break;
-  default:
-    throw runtime_error("Unsupported neighbor list mode.");
-  }
+  descriptor += "NEIGH_PURE_F      flag\n";
 
   // Query and store particle type codes.  For this we first get a
   // dummy model instance that can be queried for all the information
@@ -1132,48 +897,18 @@ void Compute::compute() {
 
   // Tricks to fix values when ghost atoms are in the game.
   if (box_->nghosts)
-    switch (neighbor_mode) {
-    case KIM_cluster:
-      // Need to calculate whole box values from particle values due to
-      // the fact that ghost atoms were included in the summation.
-      energy = 0.0;
-      virial(0) = 0.0; virial(1) = 0.0; virial(2) = 0.0;
-      virial(3) = 0.0; virial(4) = 0.0; virial(5) = 0.0;
-      if (has_particleEnergy)
-        for (unsigned i = 0; i != box_->natoms; ++i)
-          energy += particleEnergy[i];
-      if (has_particleVirial)
-        for (unsigned i = 0; i != box_->natoms; ++i) {
-          virial(0) += particleVirial[i*6 + 0];
-          virial(1) += particleVirial[i*6 + 1];
-          virial(2) += particleVirial[i*6 + 2];
-          virial(3) += particleVirial[i*6 + 3];
-          virial(4) += particleVirial[i*6 + 4];
-          virial(5) += particleVirial[i*6 + 5];
-        }
-      break;
-    case KIM_mi_opbc_f:
-    case KIM_neigh_rvec_f:
-      // These have no ghost atoms.
-      throw runtime_error("this should never happen: there are ghost atoms "
-                          "although we use MI_OPBC_F.");
-    case KIM_neigh_pure_f:
-      for (unsigned i = box_->natoms; i < box_->nall; ++i) {
-        const unsigned central = i % box_->natoms;
-        particleEnergy[central] += particleEnergy[i];
-        forces[3*central + 0] += forces[3*i + 0];
-        forces[3*central + 1] += forces[3*i + 1];
-        forces[3*central + 2] += forces[3*i + 2];
-        particleVirial[6*central + 0] += particleVirial[6*i + 0];
-        particleVirial[6*central + 1] += particleVirial[6*i + 1];
-        particleVirial[6*central + 2] += particleVirial[6*i + 2];
-        particleVirial[6*central + 3] += particleVirial[6*i + 3];
-        particleVirial[6*central + 4] += particleVirial[6*i + 4];
-        particleVirial[6*central + 5] += particleVirial[6*i + 5];
-      }
-      break;
-    default:
-      throw runtime_error("unsupported neighbor mode.");
+    for (unsigned i = box_->natoms; i < box_->nall; ++i) {
+      const unsigned central = i % box_->natoms;
+      particleEnergy[central] += particleEnergy[i];
+      forces[3*central + 0] += forces[3*i + 0];
+      forces[3*central + 1] += forces[3*i + 1];
+      forces[3*central + 2] += forces[3*i + 2];
+      particleVirial[6*central + 0] += particleVirial[6*i + 0];
+      particleVirial[6*central + 1] += particleVirial[6*i + 1];
+      particleVirial[6*central + 2] += particleVirial[6*i + 2];
+      particleVirial[6*central + 3] += particleVirial[6*i + 3];
+      particleVirial[6*central + 4] += particleVirial[6*i + 4];
+      particleVirial[6*central + 5] += particleVirial[6*i + 5];
     }
 }
 
@@ -1215,9 +950,7 @@ int Compute::get_neigh(KIM_API_model** kimmdl,
     // convention) KIM guarantees that the model will not fiddle with
     // these arrays.
     *nei1particle = const_cast<int*>(&neighbors[0]);
-    *rij = c.kim_wants_rvec
-      ? const_cast<double*>(c.box_->get_neighbor_rvecs_ptr(i))
-      : nullptr;
+    *rij = nullptr;
   } else {
     // Ghost atom.
     *particle = i;
@@ -1417,7 +1150,7 @@ double Compute::obj_func_pos(const vector<double>& x, vector<double>& grad,
   double* pos = &(c.box_->positions(0,0));
   for (unsigned i = 0; i != c.box_->natoms; ++i)
     pos[i] = x[i];
-  c.box_->update_ghost_rvecs(c.partcl_type_codes);
+  c.box_->update_ghosts(c.partcl_type_codes);
   c.compute();
   ++c.fit_counter;
   // Fill gradient.
@@ -1468,9 +1201,6 @@ double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
 
 
 void Compute::switch_boxes(Compute& other) {
-  // Check neighbor list mode.
-  if (neighbor_mode != other.neighbor_mode)
-    throw runtime_error("Neighbor list modes do not match.");
   // Check model.
   if (modelname_ != other.modelname_)
     throw runtime_error("KIM models do not match.");

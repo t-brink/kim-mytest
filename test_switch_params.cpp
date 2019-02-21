@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018 Tobias Brink
+  Copyright (c) 2018,2019 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -216,7 +216,7 @@ int main() {
   mt19937 rng(rd());
   // Create the simulation cell.
   const auto rand_box = Box::random_box(20.0, 20.0, 20.0, true, false, false, 2.1,
-                                        "Si", KIM_neigh_pure_f, "mybox", rng);
+                                        "Si", "mybox", rng);
   // Set up Tersoff PRB37 1988 ////////////////////////////////////////////////////////////////////
   Compute tersoff1988(make_unique<Box>(*rand_box),
                       "Tersoff_LAMMPS_Tersoff_PRB37_1988_Si__MO_245095684871_000");

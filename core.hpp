@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2017,2018 Tobias Brink
+  Copyright (c) 2013,2017,2018,2019 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -39,11 +39,6 @@
 
 /** The main namespace. */
 namespace mytest {
-  /** KIM neighbor mode */
-  enum KIMNeigh {
-    KIM_cluster, KIM_mi_opbc_f, KIM_neigh_pure_f, KIM_neigh_rvec_f
-  };
-
   /** Class to hold simulation box and neighbor lists.
 
       @todo Disabled neighbor list leads to segfaults because the
@@ -80,14 +75,13 @@ namespace mytest {
         @param types Unique pointer to n component array containing
                      the atom types. Must have the same length as the
                      first dimension of @p coordinates.
-        @param neighmode The neighbor list mode.
         @param name A name for the box.
     */
     Box(const Vec3D<double>& a, const Vec3D<double>& b, const Vec3D<double>& c,
         bool periodic_a, bool periodic_b, bool periodic_c,
         std::unique_ptr< Array2D<double> > coordinates,
         std::unique_ptr< Array1DInit<std::string> > types,
-        KIMNeigh neighmode, const std::string& name);
+        const std::string& name);
 
     /** Lattice constructor.
 
@@ -114,7 +108,6 @@ namespace mytest {
         @param types The types of the atoms on the lattice. The length
                      of this array must match the basis of the given
                      lattice.
-        @param neighmode The neighbor list mode.
         @param name A name for the box.
 
         @todo: lattices with c != a.
@@ -123,7 +116,7 @@ namespace mytest {
         unsigned repeat_a, unsigned repeat_b, unsigned repeat_c,
         bool periodic_a, bool periodic_b, bool periodic_c,
         const std::vector<std::string>& types,
-        KIMNeigh neighmode, const std::string& name);
+        const std::string& name);
 
     /** Copy constructor that changes the name. */
     Box(const Box& other, const std::string& new_name);
@@ -145,7 +138,6 @@ namespace mytest {
                                     bool periodic_c,
                                     double min_dist,
                                     const std::string& atomtype,
-                                    KIMNeigh neighmode,
                                     const std::string& name,
                                     std::mt19937& rng);
 
@@ -182,19 +174,6 @@ namespace mytest {
                        type codes.
     */
     void update_ghosts(const std::map<std::string,int>& typemap);
-
-    /** Update distance vectors.
-
-        Call this after changing the atom positions when using
-        NEIGH_RVEC_F. This implicitly calls update_ghosts().
-
-        Calling this method is cheaper than re-calcuting the neighbor
-        list with update_neighbor_list().
-
-        @param typemap Mapping of atom type strings to the model's
-                       type codes.
-    */
-    void update_ghost_rvecs(const std::map<std::string,int>& typemap);
 
     /** Return unique_ptr to new box with atom i deleted.
 
@@ -267,9 +246,6 @@ namespace mytest {
         periodic in ±a, ±b, and ±c direction.
     */
     const Vec3D<bool>& periodic;
-
-    /** The KIM neighbor mode supported by this box. */
-    const KIMNeigh kim_neighbor_mode;
 
     /** Number of atoms without ghost atoms. */
     const unsigned& natoms;
@@ -347,29 +323,6 @@ namespace mytest {
     const int* get_neighbors_ptr(unsigned i) const {
       return &get_neighbors(i)[0];
     }
-
-    /** Return const reference to the distance vectors of the
-        neighbors of an atom.
-
-        @param i The index of the central atom, must not be a ghost atom.
-        @return A reference to a 2D array with distance vectors. In
-                the same order as the output of get_neighbors().
-
-        @todo Implementation could be hairy if I want to return a
-              reference.  Perhaps the pointer is enough?
-    */
-    const Array2D<double>& get_neighbor_rvecs(unsigned i) const;
-
-    /** Return const pointer to the distance vectors of the
-        neighbors of an atom.
-
-        @param i The index of the central atom, must not be a ghost atom.
-        @return A pointer to a 2D array with distance vectors. In
-                the same order as the output of get_neighbors().
-    */
-    const double* get_neighbor_rvecs_ptr(unsigned i) const {
-      return &neigh_rvec_[i][0];
-    };
 
     /** Return const pointer to position (including ghosts).
 
@@ -532,8 +485,6 @@ namespace mytest {
     std::unique_ptr< Array2D<double> > ghost_positions;
     std::unique_ptr< Array1D<int> > ghost_types;
     std::vector< std::vector<int> > neigh_list_;
-    std::vector< std::vector<double> > neigh_rvec_;
-    std::vector< std::vector< Vec3D<int> > > neigh_rvec_shell_;
   };
 
 
@@ -676,7 +627,7 @@ namespace mytest {
       box_->positions(i,1) = new_pos[1];
       box_->positions(i,2) = new_pos[2];
       if (update_ghosts)
-        box_->update_ghost_rvecs(partcl_type_codes);
+        box_->update_ghosts(partcl_type_codes);
     }
 
     /** Set position of an atom.
@@ -702,7 +653,7 @@ namespace mytest {
       box_->positions(i,1) = y;
       box_->positions(i,2) = z;
       if (update_ghosts)
-        box_->update_ghost_rvecs(partcl_type_codes);
+        box_->update_ghosts(partcl_type_codes);
     }
 
     /** Move atom by specified offset.
@@ -727,7 +678,7 @@ namespace mytest {
       box_->positions(i,1) += offset[1];
       box_->positions(i,2) += offset[2];
       if (update_ghosts)
-        box_->update_ghost_rvecs(partcl_type_codes);
+        box_->update_ghosts(partcl_type_codes);
     }
 
     /** Move atom by specified offset.
@@ -757,7 +708,7 @@ namespace mytest {
       box_->positions(i,1) += offset_y;
       box_->positions(i,2) += offset_z;
       if (update_ghosts)
-        box_->update_ghost_rvecs(partcl_type_codes);
+        box_->update_ghosts(partcl_type_codes);
     }
 
     /** Deform box by given deformation matrix.
@@ -1232,8 +1183,7 @@ namespace mytest {
     std::unique_ptr<Box> box_;
     const std::string modelname_;
     KIM_API_model* model;
-    KIMNeigh neighbor_mode;
-    // Inputs and outputs supported by the model.
+    // Inputs and outputs supported by the model.       
     bool has_get_neigh;
     bool has_neighObject;
     bool has_boxSideLengths;
@@ -1270,7 +1220,6 @@ namespace mytest {
     // Store current index of KIM iteration. This (at least) makes
     // this class not thread safe!
     unsigned kim_iter_pos;
-    bool kim_wants_rvec;
     // Some counter used when fitting to get number of iterations (not
     // thread safe obviously).
     unsigned fit_counter;

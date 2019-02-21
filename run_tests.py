@@ -118,7 +118,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
             boxname = "randbox-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
             rand_boxes[i] = boxname
             min_dist = lattices["random"][elem]
-            ex("random_box {} {} {} {} {} NEIGH_PURE {}".format(
+            ex("random_box {} {} {} {} {} {}".format(
                 boxname, pbc_x, pbc_y, pbc_z, min_dist, elem
             ))
 
@@ -159,7 +159,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
             randboxname = rand_boxes[(elem, pbc_x, pbc_y, pbc_z)]
             ex("copy_box {} {}".format(randboxname, boxname))
         else:
-            ex("box {} {} {} {} {} {} {} {} NEIGH_PURE {}".format(
+            ex("box {} {} {} {} {} {} {} {} {}".format(
                 boxname, lattice, latconst, cubic, repeat,
                 pbc_x, pbc_y, pbc_z, elem
             ))
@@ -349,7 +349,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
         proc.stdin.write(cmd + "\n")
 
     # Perform init.
-    ex("box INITBOX fcc 1.0 true 1 1 1 true true true NEIGH_PURE {}"
+    ex("box INITBOX fcc 1.0 true 1 1 1 true true true {}"
        "".format(elements[0]))
     ex("model comp INITBOX {}".format(model))
 

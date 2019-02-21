@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2017 Tobias Brink
+  Copyright (c) 2013,2017,2019 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -56,11 +56,6 @@ static string to_lower(string data) {
   return data;
 }
 
-static string to_upper(string data) {
-  transform(data.begin(), data.end(), data.begin(), ::toupper);
-  return data;
-}
-
 static double to_double(const string& s) {
   istringstream iss(s);
   double x;
@@ -86,19 +81,6 @@ static bool to_bool(const string& s) {
     throw runtime_error("not a boolean: " + s);
 }
 
-static KIMNeigh to_neighmode(const string& s) {
-  if (to_upper(s) == "CLUSTER")
-    return KIM_cluster;
-  if (to_upper(s) == "MI_OPBC")
-    return KIM_mi_opbc_f;
-  if (to_upper(s) == "NEIGH_PURE")
-    return KIM_neigh_pure_f;
-  if (to_upper(s) == "NEIGH_RVEC")
-    return KIM_neigh_rvec_f;
-  else
-    throw runtime_error("not a neighbor mode: " + s);
-}
-
 
 void mytest::parse(string command,
                    map< string,unique_ptr<Box> >& boxes,
@@ -113,13 +95,13 @@ void mytest::parse(string command,
     return;
   } else if (tokens[0] == "box") {
     // Create a box
-    if (tokens.size() < 13) {
+    if (tokens.size() < 12) {
       cout << "Not enough arguments." << endl;
       return;
     }
     try {
       vector<string> types;
-      for (unsigned i = 12; i != tokens.size(); ++i)
+      for (unsigned i = 11; i != tokens.size(); ++i)
         types.push_back(tokens[i]);
       auto p = make_unique<Box>(tokens[2], to_double(tokens[3]), // Lattice
                                 to_bool(tokens[4]), // Cubic?
@@ -130,7 +112,6 @@ void mytest::parse(string command,
                                 to_bool(tokens[9]),  // periodic b
                                 to_bool(tokens[10]), // periodic c
                                 types, // Atom types
-                                to_neighmode(tokens[11]), // Neighbor list mode
                                 tokens[1] // Name
                                 );
       boxes[tokens[1]] = move(p);
@@ -140,7 +121,7 @@ void mytest::parse(string command,
     }
   } else if (tokens[0] == "random_box") {
     // Create a box
-    if (tokens.size() < 8) {
+    if (tokens.size() < 7) {
       cout << "Not enough arguments." << endl;
       return;
     }
@@ -151,8 +132,7 @@ void mytest::parse(string command,
                         to_bool(tokens[3]), // periodic b
                         to_bool(tokens[4]), // periodic c
                         to_double(tokens[5]), // min_dist between atoms
-                        tokens[7], // Atom type (TODO: more than one)    
-                        to_neighmode(tokens[6]), // Neighbor list mode
+                        tokens[6], // Atom type (TODO: more than one)    
                         tokens[1], // name
                         _DSL_RNG_);
       boxes[tokens[1]] = move(p);
@@ -329,7 +309,6 @@ void mytest::parse(string command,
                                 pa, pb, pc,
                                 move(coordinates),
                                 move(types),
-                                KIM_neigh_pure_f,
                                 tokens[3]);
     // Assign box to compute.
     iter->second.change_box(move(make_unique<Box>(*box)));

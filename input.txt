@@ -1,8 +1,8 @@
 # Prepare some boxes.
-box Si-diamond diamond 5.429 true 1 1 1 true true true NEIGH_PURE Si
-box Si-sc      sc      2.525 true 1 1 1 true true true NEIGH_PURE Si
-box Si-bcc     bcc     3.043 true 1 1 1 true true true NEIGH_PURE Si
-box Si-fcc     fcc     3.940 true 1 1 1 true true true NEIGH_PURE Si
+box Si-diamond diamond 5.429 true 1 1 1 true true true Si
+box Si-sc      sc      2.525 true 1 1 1 true true true Si
+box Si-bcc     bcc     3.043 true 1 1 1 true true true Si
+box Si-fcc     fcc     3.940 true 1 1 1 true true true Si
 
 # Init model with the first box.
 model comp Si-diamond Tersoff_LAMMPS_Erhart_Albe_CSi__MO_903987585848_002
@@ -20,7 +20,7 @@ change_box comp Si-fcc
 compute comp
 
 # Optimize non-ortho
-box Si-diamond-no diamond 5.000 false 1 1 1 true true true NEIGH_PURE Si
+box Si-diamond-no diamond 5.000 false 1 1 1 true true true Si
 change_box comp Si-diamond-no
 optimize_box comp true
 bulk_modulus_energy comp 0.05
@@ -31,7 +31,7 @@ optimize_box comp
 optimize_box comp
 
 # Optimize ortho
-box Si-diamond diamond 5.000 true 1 1 1 true true true NEIGH_PURE Si
+box Si-diamond diamond 5.000 true 1 1 1 true true true Si
 change_box comp Si-diamond
 optimize_box comp true
 bulk_modulus_energy comp 0.05
