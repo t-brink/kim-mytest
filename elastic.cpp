@@ -27,6 +27,7 @@
 #include <nlopt.hpp>
 
 #include <utility>
+#include <iostream>
 
 using namespace std;
 using namespace mytest;

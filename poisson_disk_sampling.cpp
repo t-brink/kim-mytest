@@ -182,9 +182,9 @@ void poisson_disk_sampling(double width, double height, double depth,
       const unsigned i = floor(new_point[0] / cell_size);
       const unsigned j = floor(new_point[1] / cell_size);
       const unsigned k = floor(new_point[2] / cell_size);
-      if (0 <= i && i < len_i &&
-          0 <= j && j < len_j &&
-          0 <= k && k < len_k &&
+      if (i < len_i && // unsigned ensures 0 <= i
+          j < len_j && // unsigned ensures 0 <= j
+          k < len_k && // unsigned ensures 0 <= k
           !grid_filled(i,j,k) &&
           !in_neighborhood(new_point, i, j, k, len_i, len_j, len_k,
                            grid, grid_filled, min_dist_sq,

@@ -2,11 +2,15 @@
 
 ** Remove obsolete neighbor modes [DONE]
 
-** Port to cmake
+** Port to cmake [DONE, nice and easy]
 
 ** adapt core.?pp
 
 ** check if other files need changes
+
+** the switch_boxes() and change_box() methods of Compute must check if
+   the KIM model supports the species and perhaps update the species
+   name <-> code mappings!
 
 ** document DSL [started]
 

@@ -32,7 +32,7 @@
 #include <memory>
 #include <random>
 
-#include <KIM_API.h>
+#include "KIM_SimulatorHeaders.hpp"
 
 #include "ndarray.hpp"
 #include "utils.hpp"
@@ -354,6 +354,20 @@ namespace mytest {
       return &(*ghost_types)(0);
     }
 
+    /** Return const pointer to "contributing" array.
+
+        Same arguments as for get_positions() vs @c positions
+        apply. Further difference compared to the @c types field is
+        that these are the type codes (int, not string) as the model
+        wants them.
+
+        @see get_positions()
+    */
+    const int* get_contributing_ptr() const {
+      return &contributing_[0];
+    }
+
+
     // IO //////////////////////////////////////////////////////////////
 
     /** Write to file.
@@ -434,9 +448,6 @@ namespace mytest {
         @param defmatrix The deformation matrix in Voigt notation.
         @param typemap Mapping of atom type strings to the model's
                        type codes.
-
-        @todo Take care that the box stays orthorhombic if
-              kim_neighbor_mode is KIM_mi_opbc_f.
     */
     void deform(Voigt6<double> defmatrix,
                 const std::map<std::string,int>& typemap);
@@ -449,9 +460,6 @@ namespace mytest {
         @param new_a The new box vector a.
         @param new_b The new box vector b.
         @param new_c The new box vector c.
-
-        @todo Take care that the box stays orthorhombic if
-              kim_neighbor_mode is KIM_mi_opbc_f.
     */
     void deform_to(const Vec3D<double>& new_a,
                    const Vec3D<double>& new_b,
@@ -485,6 +493,7 @@ namespace mytest {
     std::unique_ptr< Array2D<double> > ghost_positions;
     std::unique_ptr< Array1D<int> > ghost_types;
     std::vector< std::vector<int> > neigh_list_;
+    std::vector<int> contributing_; // false if ghost
   };
 
 
@@ -548,8 +557,10 @@ namespace mytest {
 
         Call after atom positions have changed more than the cutoff
         skin or if the cutoff has changed (increased).
+
+        @param force_ptr_update Force re-registering pointers to KIM.
     */
-    void update_neighbor_list();
+    void update_neighbor_list(bool force_ptr_update = false);
 
     /** Get box vector a. */
     Vec3D<double> get_a() const { return box_->a; }
@@ -1182,20 +1193,19 @@ namespace mytest {
   private:
     std::unique_ptr<Box> box_;
     const std::string modelname_;
-    KIM_API_model* model;
+    KIM::Model* model;
+    KIM::ComputeArguments* compute_arguments;
+    int nall_kim; // KIM wants an int for the number of atoms, so we
+                  // maintain a copy :-/
     // Inputs and outputs supported by the model.       
-    bool has_get_neigh;
-    bool has_neighObject;
-    bool has_boxSideLengths;
-    bool has_reinit;
+    bool has_reinit; // TODO: not handled, yet   
+    bool has_write_params; // TODO: not handled, yet   
     bool has_energy;
-    bool has_forces;
     bool has_particleEnergy;
+    bool has_forces;
     bool has_virial;
     bool has_particleVirial;
-    bool has_process_dEdr;
-    // Model input.
-    int ntypes;
+    bool has_process_dEdr; // TODO: not handled/used, yet     
     // Model output (constant).
     std::map<std::string,int> partcl_type_codes;
     std::map<int,std::string> partcl_type_names;
@@ -1226,21 +1236,23 @@ namespace mytest {
 
     /** Get neighbor list function for KIM.
 
-        @param[in] kimmdl The KIM model.
-        @param[in] mode Iterator or locator mode.
-        @param[in] request The requested index or reset/increment for
-                           iterator mode.
-        @param[out] particle The actual central atom index.
-        @param[out] numnei The number of neighbors.
-        @param[out] nei1particle Array of neighbor indices.
-        @param[out] rij Array of neighbor distance vectors.
+        @param[in] compute_ptr The Compute object.
+        @param[in] number_of_neighlists Ignored for now.  
+        @param[in] cutoffs Ignored for now.  
+        @param[in] neighbor_list_idx Ignored for now.  
+        @param[in] i The central atom index.
+        @param[out] n_neighs The number of neighbors.
+        @param[out] neighlist Array of neighbor indices.
 
         @return Status.
      */
-    static int get_neigh(KIM_API_model** kimmdl,
-                         const int* mode, const int* request,
-                         int* particle, int* numnei, int** nei1particle,
-                         double** rij);
+    static int get_neigh(void * const compute_ptr,
+                         const int number_of_neighlists,
+                         const double * const cutoffs,
+                         const int neighbor_list_idx,
+                         const int i,
+                         int * const n_neighs,
+                         const int ** const neighlist);
 
     /** Objective function for optimizing the box.
 

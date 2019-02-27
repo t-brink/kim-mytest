@@ -25,10 +25,9 @@
 //#include <cstdio>
 #include <utility>
 #include <cmath>
+#include <iostream>
 //#include <chrono>
 
-#include <KIM_API_C.h>
-#include <KIM_API_status.h>
 #include <nlopt.hpp>
 
 #include "core.hpp"
@@ -58,7 +57,8 @@ Box::Box(const Vec3D<double>& a_in,
     periodic_(periodic_a, periodic_b, periodic_c),
     natoms_(coordinates->extent(0)), nghosts_(0), nall_(natoms_),
     name_(name),
-    neigh_list_(natoms_)
+    neigh_list_(natoms_),
+    contributing_(natoms_, 1) // init to ones for all "real" atoms
 {
   if (positions.extent(0) != types.extent(0))
     throw runtime_error("types must have the same length as the "
@@ -81,7 +81,8 @@ Box::Box(const std::string& lattice, double lattice_const, bool cubic,
     types(positions.extent(0)),
     periodic_(periodic_a, periodic_b, periodic_c), // Private data.
     natoms_(positions.extent(0)), nghosts_(0), nall_(natoms_),
-    name_(name)
+    name_(name),
+    contributing_(natoms_, 1) // init to ones for all "real" atoms
 {
   if (types_in.size() != species_per_unit_cell(lattice))
     throw runtime_error("Wrong number of types for this lattice.");
@@ -296,7 +297,8 @@ Box::Box(const Box& other, const std::string& new_name)
                                     other.ghost_positions->extent(1))),
     ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
     */
-    neigh_list_(other.neigh_list_)
+    neigh_list_(other.neigh_list_),
+    contributing_(other.contributing_)
 {
   for (int i = 0; i != positions.extent(0); ++i)
     for (int j = 0; j != positions.extent(1); ++j)
@@ -335,7 +337,8 @@ Box::Box(const Box& other)
                                     other.ghost_positions->extent(1))),
     ghost_types(make_unique<Array1D<int>>(other.ghost_types->extent(0))),
     */
-    neigh_list_(other.neigh_list_)
+    neigh_list_(other.neigh_list_),
+    contributing_(other.contributing_)
 {
   for (int i = 0; i != positions.extent(0); ++i)
     for (int j = 0; j != positions.extent(1); ++j)
@@ -374,6 +377,9 @@ bool Box::update_neighbor_list(double cutoff, double skin,
     nall_ = natoms_ + nghosts_;
     ghost_positions = make_unique< Array2D<double> >(nall_, 3);
     ghost_types = make_unique< Array1D<int> >(nall_);
+    contributing_.resize(nall_, 0); // Everything that the vector is
+                                    // resized to consists only of
+                                    // ghost atoms, thus init to zero.
     reallocated = true;
   }
 
@@ -465,7 +471,7 @@ unique_ptr<Box> Box::delete_atom(unsigned i, const string& name) {
   }
   return make_unique<Box>(a, b, c, periodic[0], periodic[1], periodic[2],
                           move(new_positions), move(new_types),
-                          name_);
+                          name);
 }
 
 
@@ -641,168 +647,168 @@ Vec3D<unsigned> Box::calc_number_of_ghost_shells(double cutoff) const {
 Compute::Compute(unique_ptr<Box> box, const string& modelname)
   : box_(move(box)), modelname_(modelname)
 {
-  int status;
+  // TODO: maybe try supporting different units to test the unit conversion!   
 
-  // Assemble KIM descriptor file.
-  string descriptor =
-    "KIM_API_Version  := 1.9.0\n"
-    "\n"
-    "Unit_length      := A\n"
-    "Unit_energy      := eV\n"
-    "Unit_charge      := e\n"
-    "Unit_temperature := K\n"
-    "Unit_time        := ps\n"
-    "\n"
-    "ZeroBasedLists    flag\n"
-    "Neigh_BothAccess  flag\n";
-  descriptor += "NEIGH_PURE_F      flag\n";
+  int error;
 
-  // Query and store particle type codes.  For this we first get a
-  // dummy model instance that can be queried for all the information
-  // in the KIM descriptor.  Also add species to the test descriptor.
-  descriptor +=
-    "\n"
-    "PARTICLE_SPECIES:\n";
-  KIM_API_model* query;
-  status = KIM_API_model_info(&query, modelname.c_str());
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-  int max_str_len;
-  status = query->get_num_model_species(&ntypes, &max_str_len);
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-  for (int i = 0; i != ntypes; ++i) {
-    const char* partcl_type;
-    status = query->get_model_species(i, &partcl_type);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    string t(partcl_type);
-    int code = query->get_species_code(partcl_type, &status);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    partcl_type_codes[t] = code;
-    partcl_type_names[code] = t;
-    // Add to descriptor.
-    descriptor += t + " spec " + to_string(code) + "\n";
+  // Create KIM model. /////////////////////////////////////////////////
+  int requested_units_accepted;
+  error = KIM::Model::Create(KIM::NUMBERING::zeroBased, // TODO: test this??    
+                             KIM::LENGTH_UNIT::A,
+                             KIM::ENERGY_UNIT::eV,
+                             KIM::CHARGE_UNIT::e,
+                             KIM::TEMPERATURE_UNIT::K,
+                             KIM::TIME_UNIT::ps,
+                             modelname,
+                             &requested_units_accepted,
+                             &model);
+  if (error)
+    throw runtime_error("KIM model creation failed.");
+
+  if (!requested_units_accepted)
+    throw runtime_error("KIM model does not accept my units.");
+
+  // TODO: check for all required routines and that we can provide them     
+
+  // TODO: We could get back the units and check, but do we need to?      
+
+  // Check species. ////////////////////////////////////////////////////
+  for (int i = 0; i < box_->types.extent(0); ++i) {
+    int species_supported;
+    int species_code;
+    // Get code from model.
+    const KIM::SpeciesName sn(box_->types(i));
+    error = model->GetSpeciesSupportAndCode(sn, &species_supported,
+                                            &species_code);
+    if (error || !species_supported)
+      throw runtime_error("Species \""
+                          + box_->types(i)
+                          + "\" from box is not supported by the model.");
+    partcl_type_codes[box_->types(i)] = species_code;
+    partcl_type_names[species_code] = box_->types(i);
   }
 
-  // Get supported inputs/outputs/computes.
-  query->get_index("get_neigh", &status);
-  has_get_neigh = (status == KIM_STATUS_OK);
-  query->get_index("neighObject", &status);
-  has_neighObject = (status == KIM_STATUS_OK);
-  query->get_index("boxSideLengths", &status);
-  has_boxSideLengths = (status == KIM_STATUS_OK);
-  query->get_index("reinit", &status);
-  has_reinit = (status == KIM_STATUS_OK);
-  query->get_index("energy", &status);
-  has_energy = (status == KIM_STATUS_OK);
-  query->get_index("forces", &status);
-  has_forces = (status == KIM_STATUS_OK);
-  query->get_index("particleEnergy", &status);
-  has_particleEnergy = (status == KIM_STATUS_OK);
-  query->get_index("virial", &status);
-  has_virial = (status == KIM_STATUS_OK);
-  query->get_index("particleVirial", &status);
-  has_particleVirial = (status == KIM_STATUS_OK);
-  query->get_index("process_dEdr", &status);
-  has_process_dEdr = (status == KIM_STATUS_OK);
+  // Init KIM compute arguments. ///////////////////////////////////////
+  error = model->ComputeArgumentsCreate(&compute_arguments);
 
-  if (has_process_dEdr) {
-    // we can always compute the virial with this
-    has_virial = true;
-    has_particleVirial = true;
+  if (error)
+    throw runtime_error("KIM model->ComputeArgumentsCreate() failed.");
+
+  // Check and set the compute arguments.
+  int n_comp_args;
+  KIM::COMPUTE_ARGUMENT_NAME::GetNumberOfComputeArgumentNames(&n_comp_args);
+  for (int i = 0; i < n_comp_args; ++i) {
+    KIM::ComputeArgumentName compute_argument_name;
+    KIM::COMPUTE_ARGUMENT_NAME::GetComputeArgumentName(i,
+                                                       &compute_argument_name);
+    // TODO: get its type and support/required status and check if we are compatible     
+
+    // Set the arguments.
+    if (compute_argument_name
+        == KIM::COMPUTE_ARGUMENT_NAME::numberOfParticles) {
+      error = compute_arguments->SetArgumentPointer(compute_argument_name,
+                                                    &nall_kim);
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::particleSpeciesCodes) {
+      // The length of this array is only determined after neighbor
+      // lists have been calculated and the argument will thus be set
+      // by update_neighbor_list().
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::particleContributing) {
+      // The length of this array is only determined after neighbor
+      // lists have been calculated and the argument will thus be set
+      // by update_neighbor_list().
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::coordinates) {
+      // The length of this array is only determined after neighbor
+      // lists have been calculated and the argument will thus be set
+      // by update_neighbor_list().
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::partialEnergy) {
+      error = compute_arguments->SetArgumentPointer(compute_argument_name,
+                                                    &energy);
+      has_energy = true; // TODO: get from API    
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::partialParticleEnergy) {
+      // The length of this array is only determined after neighbor
+      // lists have been calculated and the argument will thus be set
+      // by update_neighbor_list().
+      has_particleEnergy = true; // TODO: get from API    
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::partialForces) {
+      // The length of this array is only determined after neighbor
+      // lists have been calculated and the argument will thus be set
+      // by update_neighbor_list().
+      has_forces = true; // TODO: get from API    
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::partialVirial) {
+      error = compute_arguments->SetArgumentPointer(compute_argument_name,
+                                                    &virial(0));
+      has_virial = true; // TODO: get from API    
+    } else if (compute_argument_name
+               == KIM::COMPUTE_ARGUMENT_NAME::partialParticleVirial) {
+      // The length of this array is only determined after neighbor
+      // lists have been calculated and the argument will thus be set
+      // by update_neighbor_list().
+      has_particleVirial = true; // TODO: get from API    
+    } else {
+      // TODO: complain if something else required    
+    }
+    if (error)
+      throw runtime_error("KIM model->SetArgumentPointer() failed for "
+                          + compute_argument_name.ToString() + ".");
   }
 
-  descriptor +=
-    "\n"
-    "MODEL_INPUT:\n"
-    "numberOfParticles    integer   none      []\n"
-    "numberOfSpecies      integer   none      []\n"
-    "particleSpecies      integer   none      [numberOfParticles]\n"
-    "coordinates          double    length    [numberOfParticles,3]\n";
-  if (has_get_neigh)
-    descriptor += "get_neigh            method    none      []\n";
-  if (has_neighObject)
-    descriptor += "neighObject          pointer   none      []\n";
-  if (has_boxSideLengths)
-    descriptor += "boxSideLengths       double    length    [3]\n";
-  descriptor +=
-    "\n"
-    "MODEL_OUTPUT\n"
-    "destroy              method    none      []\n"
-    "compute              method    none      []\n"
-    "cutoff               double    length    []\n";
-  if (has_reinit)
-    descriptor += "reinit               method    none      []\n";
-  if (has_energy)
-    descriptor += "energy               double    energy    []\n";
-  if (has_forces)
-    descriptor += "forces               double    force     [numberOfParticles,3]\n";
-  if (has_particleEnergy)
-    descriptor += "particleEnergy       double    energy    [numberOfParticles]\n";
-  if (has_virial)
-    descriptor += "virial               double    energy    [6]\n";
-  if (has_particleVirial)
-    descriptor += "particleVirial       double    energy    [numberOfParticles,6]\n";
+  // Check and set the callbacks.
+  int n_comp_callb;
+  KIM::COMPUTE_CALLBACK_NAME::GetNumberOfComputeCallbackNames(&n_comp_callb);
+  for (int i = 0; i < n_comp_callb; ++i) {
+    KIM::ComputeCallbackName compute_callback_name;
+    KIM::COMPUTE_CALLBACK_NAME::GetComputeCallbackName(i,
+                                                       &compute_callback_name);
+    // TODO: get its support/required status and check if we are compatible     
 
-  // Destroy the dummy model again.
-  KIM_API_free(&query, &status);
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-
-  // Check if the atom types in the box are supported by the model.
-  // TODO: enforce type string not type code!!     
-  for (int i = 0; i != box_->types.extent(0); ++i)
-    if (partcl_type_codes.find(box_->types(i)) == partcl_type_codes.end())
-      // Unknown particle code.
-      throw runtime_error("Model does not support particle type: "
-                          + box_->types(i));
-
-  // Init KIM.
-  status = KIM_API_string_init(&model, descriptor.c_str(),
-                               modelname.c_str());
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-
-  // Set constant length references to data for KIM.  We only know how
-  // long the variable length data is after calculating the ghost
-  // atoms.  But we can only do that after initializing the model,
-  // which outputs the cutoff.  So we have to make do with these for
-  // now.
-  model->setm_data(&status, 7*4,
-       "numberOfParticles",   1, &box_->nall,                1,
-       "numberOfSpecies",     1, &ntypes,                    1,
-       "neighObject",         1, this,                       int(has_neighObject),
-       "boxSideLengths",      3, &box_->box_side_lengths[0], int(has_boxSideLengths),
-       "cutoff",              1, &cutoff,                    1,
-       "energy",              1, &energy,                    int(has_energy),
-       "virial",              6, &virial(0),                 int(has_virial)
-       );
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-
-  // Pass methods to KIM.
-  if (has_get_neigh) {
-    status = model->set_method("get_neigh", 1, (func_ptr) &get_neigh);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
+    if (compute_callback_name
+        == KIM::COMPUTE_CALLBACK_NAME::GetNeighborList) {
+      error = compute_arguments->SetCallbackPointer(compute_callback_name,
+                                                    KIM::LANGUAGE_NAME::cpp,
+                                                    (KIM::Function*) &get_neigh,
+                                                    this);
+    // TODO: process_dEdr   
+    } else {
+      //TODO complain if required
+    }
+    if (error)
+      throw runtime_error("KIM model->SetCallbackPointer() failed for "
+                          + compute_callback_name.ToString() + ".");
   }
 
-  // Init KIM model.
-  status = model->model_init();
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
+  // Get cutoff(s) and create neighbor lists. //////////////////////////
+  model->GetInfluenceDistance(&cutoff);
 
+  //TODO: implement that shit, for now we just have one neighlist :-)     
+  /*
+  model->GetNeighborListPointers(&NUMBER_OF_NEIGHBORLISTS,   
+                                 &CUTOFFS,     
+                                 &WILL_REQUEST_NEIGHBORS_OF_GHOSTS);    
+  */
+
+  // Now that we know the cutoff, we calculate neighbor lists and
+  // ghost atoms.  Then we allocate memory for variable length data
+  // and pass it to KIM.
+  update_neighbor_list(); // TODO: this method is not up-to-date      
+
+  // Get parameters of the model and store 'em. ////////////////////////
+
+  //TODO     
+
+  // Check extensions. /////////////////////////////////////////////////
+
+  // TODO: these are nonstandard extensions, do we need to check for them?     
+
+
+
+  /*
   // Store free parameter names of the model.
   int n_params;
   status = model->get_num_free_params(&n_params, &max_str_len);
@@ -842,145 +848,143 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                                                 param_index));
   }
 
-  // Now that we know the cutoff, we calculate neighbor lists and
-  // ghost atoms.  Then we allocate memory for variable length data
-  // and pass it to KIM.
-  update_neighbor_list();
+  */
 }
 
 Compute::~Compute() {
-  int status;
-  status = model->model_destroy();
-  if (status < KIM_STATUS_OK)
-    cout << string("KIM error in line ") + to_string(__LINE__)
-      + string(" of file ") + string(__FILE__) << endl;
-  KIM_API_free(&model, &status);
-  if (status < KIM_STATUS_OK)
-    cout << string("KIM error in line ") + to_string(__LINE__)
-      + string(" of file ") + string(__FILE__) << endl;
+  KIM::Model::Destroy(&model);
 }
 
 
 void Compute::compute() {
   // Reset arrays to zero. Dunno if needed, but with ghost atoms I am
   // unsure.
-  for (unsigned i = 0; i < forces.size(); ++i)
-    forces[i] = 0;
-  for (unsigned i = 0; i < particleEnergy.size(); ++i)
-    particleEnergy[i] = 0;
-  for (unsigned i = 0; i < particleVirial.size(); ++i)
-    particleVirial[i] = 0;
+  if (has_forces)
+    for (unsigned i = 0; i < forces.size(); ++i)
+      forces[i] = 0;
+  if (has_particleEnergy)
+    for (unsigned i = 0; i < particleEnergy.size(); ++i)
+      particleEnergy[i] = 0;
+  if (has_particleVirial)
+    for (unsigned i = 0; i < particleVirial.size(); ++i)
+      particleVirial[i] = 0;
   // Compute.
-  const int status = model->model_compute();
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+  const int error = model->Compute(compute_arguments);
+  if (error)
+    throw runtime_error(string("Error in KIM's compute function in line ")
+                        + to_string(__LINE__)
                         + string(" of file ") + string(__FILE__));
 
   // Before reducing the ghost atoms, calculate the global virial from
   // forces. This can be used to verify the global virial returned by
   // the model.
-  global_virial_from_forces_xx = 0.0;
-  global_virial_from_forces_yy = 0.0;
-  global_virial_from_forces_zz = 0.0;
-  global_virial_from_forces_yz = 0.0;
-  global_virial_from_forces_xz = 0.0;
-  global_virial_from_forces_xy = 0.0;
-  const double* ghost_pos = box_->get_positions_ptr();
-  for (unsigned i = 0; i < box_->nall; ++i) {
-    global_virial_from_forces_xx -= ghost_pos[3*i + 0] * forces[3*i + 0];
-    global_virial_from_forces_yy -= ghost_pos[3*i + 1] * forces[3*i + 1];
-    global_virial_from_forces_zz -= ghost_pos[3*i + 2] * forces[3*i + 2];
-    global_virial_from_forces_yz -= ghost_pos[3*i + 1] * forces[3*i + 2];
-    global_virial_from_forces_xz -= ghost_pos[3*i + 0] * forces[3*i + 2];
-    global_virial_from_forces_xy -= ghost_pos[3*i + 0] * forces[3*i + 1];
+  if (has_forces) {
+    global_virial_from_forces_xx = 0.0;
+    global_virial_from_forces_yy = 0.0;
+    global_virial_from_forces_zz = 0.0;
+    global_virial_from_forces_yz = 0.0;
+    global_virial_from_forces_xz = 0.0;
+    global_virial_from_forces_xy = 0.0;
+    const double* ghost_pos = box_->get_positions_ptr();
+    for (unsigned i = 0; i < box_->nall; ++i) {
+      global_virial_from_forces_xx -= ghost_pos[3*i + 0] * forces[3*i + 0];
+      global_virial_from_forces_yy -= ghost_pos[3*i + 1] * forces[3*i + 1];
+      global_virial_from_forces_zz -= ghost_pos[3*i + 2] * forces[3*i + 2];
+      global_virial_from_forces_yz -= ghost_pos[3*i + 1] * forces[3*i + 2];
+      global_virial_from_forces_xz -= ghost_pos[3*i + 0] * forces[3*i + 2];
+      global_virial_from_forces_xy -= ghost_pos[3*i + 0] * forces[3*i + 1];
+    }
   }
 
   // Tricks to fix values when ghost atoms are in the game.
   if (box_->nghosts)
     for (unsigned i = box_->natoms; i < box_->nall; ++i) {
       const unsigned central = i % box_->natoms;
-      particleEnergy[central] += particleEnergy[i];
-      forces[3*central + 0] += forces[3*i + 0];
-      forces[3*central + 1] += forces[3*i + 1];
-      forces[3*central + 2] += forces[3*i + 2];
-      particleVirial[6*central + 0] += particleVirial[6*i + 0];
-      particleVirial[6*central + 1] += particleVirial[6*i + 1];
-      particleVirial[6*central + 2] += particleVirial[6*i + 2];
-      particleVirial[6*central + 3] += particleVirial[6*i + 3];
-      particleVirial[6*central + 4] += particleVirial[6*i + 4];
-      particleVirial[6*central + 5] += particleVirial[6*i + 5];
+      if (has_particleEnergy) {
+        particleEnergy[central] += particleEnergy[i];
+      }
+      if (has_forces) {
+        forces[3*central + 0] += forces[3*i + 0];
+        forces[3*central + 1] += forces[3*i + 1];
+        forces[3*central + 2] += forces[3*i + 2];
+      }
+      if (has_particleVirial) {
+        particleVirial[6*central + 0] += particleVirial[6*i + 0];
+        particleVirial[6*central + 1] += particleVirial[6*i + 1];
+        particleVirial[6*central + 2] += particleVirial[6*i + 2];
+        particleVirial[6*central + 3] += particleVirial[6*i + 3];
+        particleVirial[6*central + 4] += particleVirial[6*i + 4];
+        particleVirial[6*central + 5] += particleVirial[6*i + 5];
+      }
     }
 }
 
 
-int Compute::get_neigh(KIM_API_model** kimmdl,
-                       const int *mode, const int* request,
-                       int *particle, int *numnei, int **nei1particle,
-                       double **rij) {
-  KIM_API_model& model = **kimmdl;
-  int status;
-  Compute& c = *( (Compute*)model.get_data("neighObject", &status) );
-  if (status < KIM_STATUS_OK)
-    return KIM_STATUS_FAIL;
+int Compute::get_neigh(void * const compute_ptr,
+                       const int number_of_neighlists,
+                       const double * const cutoffs,
+                       const int neighbor_list_idx,
+                       const int i,
+                       int * const n_neighs,
+                       const int ** const neighlist) {
+  // TODO: implement different neighbor lists if requested        
 
-  // Get central atom.
-  int i;
-  if (*mode == 0) { // Iterator mode.
-    if (*request == 0) { // Reset requested.
-      c.kim_iter_pos = 0;
-      return KIM_STATUS_NEIGH_ITER_INIT_OK;
-    } else {             // Increment requested.
-      i = c.kim_iter_pos;
-      // Cancel if all non-ghost atoms exhausted.
-      if (i >= static_cast<int>(c.box_->natoms))
-        return KIM_STATUS_NEIGH_ITER_PAST_END;
-      ++c.kim_iter_pos;
-    }
-  } else {          // Locator mode.
-    i = *request;
-  }
+  Compute& c = *( (Compute *)compute_ptr );
 
-  // Prepare return values.
-  if (i < static_cast<int>(c.box_->natoms)) {
+  if (i < 0 || i >= c.nall_kim) {
+    // Out of range access.
+    return 1;
+  } else if (i < c.nall_kim) {
     // Not a ghost atom.
     const vector<int>& neighbors = c.box_->get_neighbors(i);
-    *particle = i;
-    *numnei = neighbors.size();
-    // We can get away with the const casts because (at least by
-    // convention) KIM guarantees that the model will not fiddle with
-    // these arrays.
-    *nei1particle = const_cast<int*>(&neighbors[0]);
-    *rij = nullptr;
+    *n_neighs = neighbors.size();
+    *neighlist = &neighbors[0];
   } else {
-    // Ghost atom.
-    *particle = i;
-    *numnei = 0;
-    *nei1particle = nullptr;
-    *rij = nullptr;
+    // Ghost atom. Has no neighbors.
+    *n_neighs = 0;
+    *neighlist = nullptr;
   }
 
-  return KIM_STATUS_OK;
+  return 0;
 }
 
-void Compute::update_neighbor_list() {
-  int status;
+void Compute::update_neighbor_list(bool force_ptr_update) {
   // TODO: For now the skin is 0.
   const bool arrays_changed = box_->update_neighbor_list(cutoff, 0.0,
                                                          partcl_type_codes);
-  if (arrays_changed) {
+  if (force_ptr_update || arrays_changed) {
     const unsigned n = box_->nall;
+    nall_kim = n; // update the number of atoms variable exposed to KIM.
     if (has_forces) forces.resize(3 * n);
     if (has_particleEnergy) particleEnergy.resize(n);
     if (has_particleVirial) particleVirial.resize(6 * n);
-    model->setm_data(&status, 5*4, // TODO: use indices!
-        "coordinates",    3*n, box_->get_positions_ptr(), 1,
-        "particleSpecies",  n, box_->get_types_ptr(),     1,
-        "forces",         3*n, &forces[0],                int(has_forces),
-        "particleEnergy",   n, &particleEnergy[0],        int(has_particleEnergy),
-        "particleVirial", 6*n, &particleVirial[0],        int(has_particleVirial)
-        );
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
+    int error =
+      compute_arguments->SetArgumentPointer(
+        KIM::COMPUTE_ARGUMENT_NAME::particleSpeciesCodes,
+        box_->get_types_ptr())
+      ||
+      compute_arguments->SetArgumentPointer(
+        KIM::COMPUTE_ARGUMENT_NAME::particleContributing,
+        box_->get_contributing_ptr())
+      ||
+      compute_arguments->SetArgumentPointer(
+        KIM::COMPUTE_ARGUMENT_NAME::coordinates,
+        box_->get_positions_ptr());
+    if (has_particleEnergy)
+      error = error || compute_arguments->SetArgumentPointer(
+                         KIM::COMPUTE_ARGUMENT_NAME::partialParticleEnergy,
+                         &particleEnergy[0]);
+    if (has_forces)
+      error = error || compute_arguments->SetArgumentPointer(
+                         KIM::COMPUTE_ARGUMENT_NAME::partialForces,
+                         &forces[0]);
+    if (has_particleVirial)
+      error = error || compute_arguments->SetArgumentPointer(
+                         KIM::COMPUTE_ARGUMENT_NAME::partialParticleVirial,
+                         &particleVirial[0]);
+    if (error)
+      throw runtime_error(string("Error in KIM's SetArgumentPointer in line ")
+                          + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
   }
 }
@@ -992,6 +996,8 @@ void Compute::set_parameter_impl(const string& param_name,
   // Check if the model supports reinit.
   if (!has_reinit)
     throw runtime_error("model does not support changing parameters.");
+  throw runtime_error("not yet implemented, sorry :-(");
+  /*
   // Get parameter data.
   const auto it = free_parameter_map.find(param_name);
   if (it == free_parameter_map.end())
@@ -1025,6 +1031,7 @@ void Compute::set_parameter_impl(const string& param_name,
       throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
                           + string(" of file ") + string(__FILE__));
   }
+  */
 }
 
 void Compute::set_parameter(const string& param_name,
@@ -1045,6 +1052,8 @@ void Compute::set_parameter(const string& param_name,
 template<typename T>
 T Compute::get_parameter_impl(const string& param_name,
                               const vector<unsigned>& indices) {
+  throw runtime_error("not yet implemented, sorry :-(");
+  /*
   // Get parameter data.
   const auto it = free_parameter_map.find(param_name);
   if (it == free_parameter_map.end())
@@ -1070,6 +1079,7 @@ T Compute::get_parameter_impl(const string& param_name,
     index += product * indices[k];
   }
   return p[index];
+  */
 }
 
 int Compute::get_parameter_int(const string& param_name,
@@ -1220,22 +1230,7 @@ unique_ptr<Box> Compute::change_box(unique_ptr<Box> new_box) {
 
 
 void Compute::update_kim_after_box_change() {
-  update_neighbor_list();
-  int status;
-  const unsigned n = box_->nall;
-  forces.resize(3 * n);
-  particleEnergy.resize(n);
-  particleVirial.resize(6 * n);
-  model->setm_data(&status, 7*4, // TODO: use indices!
-      "numberOfParticles",   1, &box_->nall,                1,
-      "boxSideLengths",      3, &box_->box_side_lengths[0], int(has_boxSideLengths),
-      "coordinates",       3*n, box_->get_positions_ptr(),  1,
-      "particleSpecies",     n, box_->get_types_ptr(),      1,
-      "forces",            3*n, &forces[0],                 int(has_forces),
-      "particleEnergy",      n, &particleEnergy[0],         int(has_particleEnergy),
-      "particleVirial",    6*n, &particleVirial[0],         int(has_particleVirial)
-      );
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
+  // Also force updating all pointers and resizing all output array since
+  // the box changed.
+  update_neighbor_list(true);
 }
