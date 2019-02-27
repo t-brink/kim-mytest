@@ -92,10 +92,16 @@ Write the given box to a file in extended XYZ format.
 compute
 =======
 
-compute <model name>
+compute <model name> [<n iterations>]
 
 Compute and store values for the given model using its currently
 associated box.
+
+Optionally, the compute can be repeated n times. This is mostly useful
+for benchmarking (after all the result should be the same every time).
+
+TODO: if iterations are requested, the time the computation took
+      should be printed.   
 
 
 check_testfile

@@ -243,17 +243,21 @@ void mytest::parse(string command,
     }
     iter->second->write_to(tokens[2]);
   } else if (tokens[0] == "compute") {
-    if (tokens.size() != 2) {
+    if (tokens.size() < 2 || tokens.size() > 3) {
       cout << "Wrong number of arguments." << endl;
       return;
     }
+    const unsigned n_iterations =
+      (tokens.size() == 2) ? 1 : to_unsigned(tokens[2]);
     const auto iter = computes.find(tokens[1]);
     if (iter == computes.end()) {
       cout << "Unknown computer: " << tokens[1] << endl;
       return;
     }
     try {
-      iter->second.compute();
+      for (unsigned i = 0; i < n_iterations; ++i) {
+        iter->second.compute();
+      }
     } catch (const exception& e) {
       cout << e.what() << endl;
       return;
