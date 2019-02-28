@@ -501,26 +501,19 @@ namespace mytest {
   class FreeParam {
   public:
     FreeParam(const std::string& name,
-              const std::vector<unsigned>& shape,
+              const std::string& description,
+              KIM::DataType data_type,
+              int size,
               int kim_index)
-      : name(name), rank(shape.size()), size(mult_(shape)), shape(shape),
-        kim_index(kim_index)
+      : name(name), description(description),
+        data_type(data_type), size(size), kim_index(kim_index)
     {}
 
     const std::string name;
-    const unsigned rank;
+    const std::string description;
+    const KIM::DataType data_type;
     const unsigned size;
-    const std::vector<unsigned> shape;
     const int kim_index;
-
-  private:
-    /** Helper to get the product of all vector entries. */
-    static unsigned mult_(const std::vector<unsigned>& shape) {
-      unsigned product = 1;
-      for (unsigned factor : shape)
-        product *= factor;
-      return product;
-    }
   };
 
 
@@ -811,9 +804,8 @@ namespace mytest {
     /** Change model parameter.
 
         @param param_name KIM name of the free parameter.
-        @param indices Indices indicating which element of the
-                       parameter array to access (must have zero
-                       length for parameters that are scalars).
+        @param index Index indicating which element of the
+                     parameter array to access.
         @param value The new value (must match the type of the
                      parameter).
         @param reinit The new parameter may not actually be used or
@@ -821,26 +813,16 @@ namespace mytest {
                       reinit = true. Setting it to false can be used
                       when updating several parameters in a row to
                       save computation time. Optional, default is @c true.
-
-        @todo There is no way to know the *type* of the free parameter 
-        using the KIM API.  We don't check for now.                    
     */
     void set_parameter(const std::string& param_name,
-                       const std::vector<unsigned>& indices,
+                       const unsigned index,
                        double value, bool reinit = true);
-
-    int get_parameter_int(const std::string& param_name,
-                          const std::vector<unsigned>& indices);
-
-    double get_parameter_double(const std::string& param_name,
-                                const std::vector<unsigned>& indices);
 
     /** Change model parameter.
 
         @param param_name KIM name of the free parameter.
-        @param indices Indices indicating which element of the
-                       parameter array to access (must have zero
-                       length for parameters that are scalars).
+        @param index Index indicating which element of the
+                     parameter array to access.
         @param value The new value (must match the type of the
                      parameter).
         @param reinit The new parameter may not actually be used or
@@ -848,13 +830,16 @@ namespace mytest {
                       reinit = true. Setting it to false can be used
                       when updating several parameters in a row to
                       save computation time. Optional, default is @c true.
-
-        @todo There is no way to know the *type* of the free parameter 
-        using the KIM API.  We don't check for now.                    
     */
     void set_parameter(const std::string& param_name,
-                       const std::vector<unsigned>& indices,
+                       const unsigned index,
                        int value, bool reinit = true);
+
+    int get_parameter_int(const std::string& param_name,
+                          const unsigned index);
+
+    double get_parameter_double(const std::string& param_name,
+                                const unsigned index);
 
     /** Optimize box vector lengths to minimize energy.
 
@@ -1197,7 +1182,7 @@ namespace mytest {
     KIM::ComputeArguments* compute_arguments;
     int nall_kim; // KIM wants an int for the number of atoms, so we
                   // maintain a copy :-/
-    // Inputs and outputs supported by the model.       
+    // Inputs and outputs supported by the model.
     bool has_reinit; // TODO: not handled, yet   
     bool has_write_params; // TODO: not handled, yet   
     bool has_energy;
@@ -1210,7 +1195,6 @@ namespace mytest {
     std::map<std::string,int> partcl_type_codes;
     std::map<int,std::string> partcl_type_names;
     double cutoff;
-    std::vector<FreeParam> free_parameters; // TODO: accessors   
     std::map<std::string,FreeParam> free_parameter_map;
     // Computation results, fixed length.
     double energy;
@@ -1270,13 +1254,13 @@ namespace mytest {
     /** set_parameter() implementation. */
     template<typename T>
     void set_parameter_impl(const std::string& param_name,
-                            const std::vector<unsigned>& indices,
+                            const unsigned index,
                             T value, bool reinit);
 
     /** get_parameter() implementation. */
     template<typename T>
     T get_parameter_impl(const std::string& param_name,
-                         const std::vector<unsigned>& indices);
+                         const unsigned index);
 
     /** What it says on the tin. */
     void update_kim_after_box_change();

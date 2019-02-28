@@ -668,7 +668,58 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   if (!requested_units_accepted)
     throw runtime_error("KIM model does not accept my units.");
 
-  // TODO: check for all required routines and that we can provide them     
+  // Check routines and register support. //////////////////////////////
+  int n_model_routines;
+  KIM::MODEL_ROUTINE_NAME::GetNumberOfModelRoutineNames(&n_model_routines);
+  for (int i = 0; i < n_model_routines; ++i) {
+    KIM::ModelRoutineName model_routine_name;
+    KIM::MODEL_ROUTINE_NAME::GetModelRoutineName(i, &model_routine_name);
+
+    int present, required;
+    error = model->IsRoutinePresent(model_routine_name, &present, &required);
+    if (error)
+      throw runtime_error("KIM model->IsRoutinePresent() failed for "
+                          + model_routine_name.ToString() + ".");
+
+    if (model_routine_name
+        == KIM::MODEL_ROUTINE_NAME::Create
+        ||
+        model_routine_name
+        == KIM::MODEL_ROUTINE_NAME::ComputeArgumentsCreate
+        ||
+        model_routine_name
+        == KIM::MODEL_ROUTINE_NAME::Compute
+        ||
+        model_routine_name
+        == KIM::MODEL_ROUTINE_NAME::ComputeArgumentsDestroy
+        ||
+        model_routine_name
+        == KIM::MODEL_ROUTINE_NAME::Destroy) {
+      // Those are required by the API, so let's just check they are there.
+      if (!present)
+        throw runtime_error("The required routine \""
+                            + model_routine_name.ToString()
+                            + "\" is missing.");
+    } else if (model_routine_name
+               == KIM::MODEL_ROUTINE_NAME::Extension) {
+      // Not supported by me.
+      if (present && required)
+        throw runtime_error("The model requires an extension. "
+                            "This is not supported.");
+    } else if (model_routine_name
+               == KIM::MODEL_ROUTINE_NAME::Refresh) {
+      has_reinit = present;
+    } else if (model_routine_name
+               == KIM::MODEL_ROUTINE_NAME::WriteParameterizedModel) {
+      has_write_params = present;
+    } else {
+      // Unknown.
+      if (present && required)
+        throw runtime_error("The unknown routine \""
+                            + model_routine_name.ToString()
+                            + "\" is required by the model.");
+    }
+  }
 
   // TODO: We could get back the units and check, but do we need to?      
 
@@ -800,55 +851,28 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
 
   // Get parameters of the model and store 'em. ////////////////////////
 
-  //TODO     
+  if (has_reinit) {
+    int n_params;
+    model->GetNumberOfParameters(&n_params);
 
-  // Check extensions. /////////////////////////////////////////////////
-
-  // TODO: these are nonstandard extensions, do we need to check for them?     
-
-
-
-  /*
-  // Store free parameter names of the model.
-  int n_params;
-  status = model->get_num_free_params(&n_params, &max_str_len);
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-  for (int i = 0; i != n_params; ++i) {
-    const char* pn;
-    status = model->get_free_parameter(i, &pn);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    const string param_name(pn);
-    const int param_index = model->get_index(pn, &status);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    const int param_rank = model->get_rank_by_index(param_index, &status);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    vector<int> param_shape_(param_rank);
-    model->get_shape_by_index(param_index, &param_shape_[0], &status);
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
-    vector<unsigned> param_shape;
-    for (int j = 0; j != param_rank; ++j)
-      param_shape.push_back(param_shape_[j]);
-    FreeParam fp(param_name, param_shape, param_index);
-    free_parameters.push_back(fp);
-    // Fancy way to do free_parameter_map[param_name] = fp; but
-    // without assignment or copy.
-    free_parameter_map.emplace(piecewise_construct,
-                               forward_as_tuple(param_name),
-                               forward_as_tuple(param_name, param_shape,
-                                                param_index));
+    for (int i; i < n_params; ++i) {
+      KIM::DataType data_type;
+      const string * param_name;
+      const string * param_desc;
+      int size;
+      model->GetParameterMetadata(i, &data_type, &size,
+                                  &param_name, &param_desc);
+      // Fancy way to do free_parameter_map[param_name] = fp; but
+      // without assignment or copy.
+      free_parameter_map.emplace(piecewise_construct,
+                                 forward_as_tuple(*param_name),
+                                 forward_as_tuple(*param_name,
+                                                  *param_desc,
+                                                  data_type,
+                                                  size,
+                                                  i));
+    }
   }
-
-  */
 }
 
 Compute::~Compute() {
@@ -991,107 +1015,91 @@ void Compute::update_neighbor_list(bool force_ptr_update) {
 
 template<typename T>
 void Compute::set_parameter_impl(const string& param_name,
-                                 const vector<unsigned>& indices,
+                                 const unsigned index,
                                  T value, bool reinit) {
   // Check if the model supports reinit.
   if (!has_reinit)
     throw runtime_error("model does not support changing parameters.");
-  throw runtime_error("not yet implemented, sorry :-(");
-  /*
   // Get parameter data.
   const auto it = free_parameter_map.find(param_name);
   if (it == free_parameter_map.end())
     throw runtime_error("Unknown free parameter: " + param_name);
   const FreeParam& param = it->second;
-  // Check rank.
-  if (indices.size() != param.rank)
-    throw runtime_error("Rank of indices ("
-                        + to_string(indices.size())
-                        + ") doesn't match rank of parameter ("
-                        + to_string(param.rank) + ")");
+  // Check parameter type.
+  if (param.data_type == KIM::DATA_TYPE::Integer
+      &&
+      !is_same<T, int>::value)
+    throw runtime_error("parameter \"" + param_name + "\" is an int!");
+  else if (param.data_type == KIM::DATA_TYPE::Double
+           &&
+           !is_same<T, double>::value)
+    throw runtime_error("parameter \"" + param_name + "\" is a double!");
+  // Check index.
+  if (index >= param.size)
+    throw runtime_error("index " + to_string(index) + " out of bounds [0; "
+                        + to_string(param.size-1) + "].");
   // Set it.
-  int status;
-  T* p = (T*)model->get_data_by_index(param.kim_index, &status);
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-  unsigned index = 0;
-  for (unsigned k = 0; k != param.rank; ++k) {
-    unsigned product = 1;
-    for (unsigned l = k + 1; l != param.rank; ++l)
-      product *= param.shape[l];
-    index += product * indices[k];
-  }
-  p[index] = value;
-
-  // Reinit model.
+  int error = model->SetParameter(param.kim_index, index, value);
+  if (error)
+    throw runtime_error("KIM model SetParameter() returned an error");
+  // Update KIM model if requested.
   if (reinit) {
-    status = model->model_reinit();
-    if (status < KIM_STATUS_OK)
-      throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                          + string(" of file ") + string(__FILE__));
+    error = model->ClearThenRefresh();
+    if (error)
+      throw runtime_error("KIM model ClearThenRefresh() returned an error");
   }
-  */
 }
 
 void Compute::set_parameter(const string& param_name,
-                            const vector<unsigned>& indices,
+                            const unsigned index,
                             double value, bool reinit) {
-  // TODO: check if this uses the correct type.     
-  set_parameter_impl<double>(param_name, indices, value, reinit);
+  set_parameter_impl<double>(param_name, index, value, reinit);
 }
 
 void Compute::set_parameter(const string& param_name,
-                            const vector<unsigned>& indices,
+                            const unsigned index,
                             int value, bool reinit) {
-  // TODO: check if this uses the correct type.     
-  set_parameter_impl<int>(param_name, indices, value, reinit);
+  set_parameter_impl<int>(param_name, index, value, reinit);
 }
 
 
 template<typename T>
 T Compute::get_parameter_impl(const string& param_name,
-                              const vector<unsigned>& indices) {
-  throw runtime_error("not yet implemented, sorry :-(");
-  /*
+                              const unsigned index) {
   // Get parameter data.
   const auto it = free_parameter_map.find(param_name);
   if (it == free_parameter_map.end())
     throw runtime_error("Unknown free parameter: " + param_name);
   const FreeParam& param = it->second;
-  // Check rank.
-  if (indices.size() != param.rank)
-    throw runtime_error("Rank of indices ("
-                        + to_string(indices.size())
-                        + ") doesn't match rank of parameter ("
-                        + to_string(param.rank) + ")");
+  // Check parameter type.
+  if (param.data_type == KIM::DATA_TYPE::Integer
+      &&
+      !is_same<T, int>::value)
+    throw runtime_error("parameter \"" + param_name + "\" is an int!");
+  else if (param.data_type == KIM::DATA_TYPE::Double
+           &&
+           !is_same<T, double>::value)
+    throw runtime_error("parameter \"" + param_name + "\" is a double!");
+  // Check index.
+  if (index >= param.size)
+    throw runtime_error("index " + to_string(index) + " out of bounds [0; "
+                        + to_string(param.size-1) + "].");
   // Get it.
-  int status;
-  T* p = (T*)model->get_data_by_index(param.kim_index, &status);
-  if (status < KIM_STATUS_OK)
-    throw runtime_error(string("KIM error in line ") + to_string(__LINE__)
-                        + string(" of file ") + string(__FILE__));
-  unsigned index = 0;
-  for (unsigned k = 0; k != param.rank; ++k) {
-    unsigned product = 1;
-    for (unsigned l = k + 1; l != param.rank; ++l)
-      product *= param.shape[l];
-    index += product * indices[k];
-  }
-  return p[index];
-  */
+  T retval;
+  const int error = model->GetParameter(param.kim_index, index, &retval);
+  if (error)
+    throw runtime_error("KIM model GetParameter() returned an error");
+  return retval;
 }
 
 int Compute::get_parameter_int(const string& param_name,
-                               const vector<unsigned>& indices) {
-  // TODO: check if this uses the correct type.     
-  return get_parameter_impl<int>(param_name, indices);
+                               const unsigned index) {
+  return get_parameter_impl<int>(param_name, index);
 }
 
 double Compute::get_parameter_double(const string& param_name,
-                                     const vector<unsigned>& indices) {
-  // TODO: check if this uses the correct type.     
-  return get_parameter_impl<double>(param_name, indices);
+                                     const unsigned index) {
+  return get_parameter_impl<double>(param_name, index);
 }
 
 

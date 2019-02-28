@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
           file=sys.stderr, flush=True)
     start = time.time()
 
-    proc = subprocess.Popen(["./mytest"],
+    proc = subprocess.Popen(["./build/mytest"],
                             stdin=subprocess.PIPE,
                             universal_newlines=True)
     def ex(cmd):
@@ -342,7 +342,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
           file=sys.stderr, flush=True)
     start = time.time()
 
-    proc = subprocess.Popen(["./mytest"],
+    proc = subprocess.Popen(["./build/mytest"],
                             stdin=subprocess.PIPE,
                             universal_newlines=True)
     def ex(cmd):
