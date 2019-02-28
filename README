@@ -98,10 +98,9 @@ Compute and store values for the given model using its currently
 associated box.
 
 Optionally, the compute can be repeated n times. This is mostly useful
-for benchmarking (after all the result should be the same every time).
-
-TODO: if iterations are requested, the time the computation took
-      should be printed.   
+for benchmarking (after all the result should be the same every
+time). If n is greater than 1, the walltime needed to do all the
+calculations is printed.
 
 
 check_testfile

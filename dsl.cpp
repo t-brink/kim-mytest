@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <random>
 #include <limits>
+#include <chrono>
 
 #include "utils.hpp"
 
@@ -254,6 +255,7 @@ void mytest::parse(string command,
       cout << "Unknown computer: " << tokens[1] << endl;
       return;
     }
+    const chrono::steady_clock::time_point start = chrono::steady_clock::now();
     try {
       for (unsigned i = 0; i < n_iterations; ++i) {
         iter->second.compute();
@@ -262,8 +264,15 @@ void mytest::parse(string command,
       cout << e.what() << endl;
       return;
     }
+    const chrono::steady_clock::time_point stop = chrono::steady_clock::now();
     cout << "Cohesive energy: "
-         << iter->second.get_energy_per_atom() << " eV/atom" << endl;
+         << iter->second.get_energy_per_atom() << " eV/atom";
+    if (n_iterations > 1) {
+      double elapsed =
+        chrono::duration_cast<chrono::microseconds>(stop-start).count() * 1e-6;
+      cout << "    (finished in " << elapsed << " s)";
+    }
+    cout << endl;
   } else if (tokens[0] == "check_testfile") {
     if (tokens.size() != 4) {
       cout << "Wrong number of arguments." << endl;

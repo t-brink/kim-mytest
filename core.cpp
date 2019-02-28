@@ -796,7 +796,7 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
   // Now that we know the cutoff, we calculate neighbor lists and
   // ghost atoms.  Then we allocate memory for variable length data
   // and pass it to KIM.
-  update_neighbor_list(); // TODO: this method is not up-to-date      
+  update_neighbor_list();
 
   // Get parameters of the model and store 'em. ////////////////////////
 
