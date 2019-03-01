@@ -10,7 +10,7 @@
 
 *** implement writing parameters out
 
-** check if other files need changes
+** check if other files need changes [DONE]
 
 ** the switch_boxes() and change_box() methods of Compute must check if
    the KIM model supports the species and perhaps update the species
@@ -22,9 +22,9 @@
 
 ** run tests
 
-*** changing parameters buggy
+*** changing parameters buggy [DONE]
 
-*** some crashes
+*** some crashes [DONE]
 
 *** dE/dr checks missing
 

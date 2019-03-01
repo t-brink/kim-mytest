@@ -111,7 +111,7 @@ void do_the_shit(unique_ptr<Box> box, const string& modelname,
                  const AllResults& res_erhart2005) {
   Compute comp(move(box), modelname);
   cout << "model: " << modelname << endl;
-  /* */
+  /*
   const unsigned idx2 = 0;
   cout << "    A  = " << comp.get_parameter_double("A", idx2) << endl;
   cout << "    B  = " << comp.get_parameter_double("B", idx2) << endl;
@@ -128,109 +128,82 @@ void do_the_shit(unique_ptr<Box> box, const string& modelname,
   cout << "    h  = " << comp.get_parameter_double("h", idx3) << endl;
   cout << "    Rc = " << comp.get_parameter_double("Rc", idx3) << endl;
   cout << "    Dc = " << comp.get_parameter_double("Dc", idx3) << endl;
-  /* */
+  */
   comp.compute();
   cout << "E = " << comp.get_energy() << " eV" << endl;
 
-  // Set to Tersoff PRB37 1988 (all types Si)
-  {
-  const unsigned nspec = comp.get_number_of_particle_types();
-  for (unsigned i = 0; i < nspec; ++i) {
-  for (unsigned j = 0; j < nspec; ++j) {
-  for (unsigned k = 0; k < nspec; ++k) {
-  const unsigned idx2 = i*nspec + j; // we know the memory layout of the params.
-  const unsigned idx3 = i*nspec*nspec + j*nspec + k;
-  comp.set_parameter("A", idx2, 3264.7, false);
-  comp.set_parameter("B", idx2, 95.373, false);
-  comp.set_parameter("lambda1", idx2, 3.2394, false);
-  comp.set_parameter("lambda2", idx2, 1.3258, false);
-  comp.set_parameter("beta", idx2, 0.33675, false);
-  comp.set_parameter("n", idx2, 22.956, false);
-  comp.set_parameter("lambda3", idx3, 1.3258, false);
-  comp.set_parameter("m", idx3, 3, false);
-  comp.set_parameter("gamma", idx3, 1.0, false);
-  comp.set_parameter("c", idx3, 4.8381, false);
-  comp.set_parameter("d", idx3, 2.0417, false);
-  comp.set_parameter("h", idx3, 0.0, false);
-  comp.set_parameter("Rc", idx3, 3.0, false);
-  comp.set_parameter("Dc", idx3, 0.2, true);
-  }}}
-  }
+  // Set Si to Tersoff PRB37 1988
+  comp.set_parameter("A", "Si", "Si", 3264.7, false);
+  comp.set_parameter("B", "Si", "Si", 95.373, false);
+  comp.set_parameter("lambda1", "Si", "Si", 3.2394, false);
+  comp.set_parameter("lambda2", "Si", "Si", 1.3258, false);
+  comp.set_parameter("beta", "Si", "Si", 0.33675, false);
+  comp.set_parameter("n", "Si", "Si", 22.956, false);
+  comp.set_parameter("lambda3", "Si", "Si", "Si", 1.3258, false);
+  comp.set_parameter("m", "Si", "Si", "Si", 3, false);
+  comp.set_parameter("gamma", "Si", "Si", "Si", 1.0, false);
+  comp.set_parameter("c", "Si", "Si", "Si", 4.8381, false);
+  comp.set_parameter("d", "Si", "Si", "Si", 2.0417, false);
+  comp.set_parameter("h", "Si", "Si", "Si", 0.0, false);
+  comp.set_parameter("Rc", "Si", "Si", "Si", 3.0, false);
+  comp.set_parameter("Dc", "Si", "Si", "Si", 0.2, true);
   comp.update_neighbor_list();
   AllResults new_tersoff1988 = compute(comp);
   cout << "Tersoff PRB37 1988: ";
   if (new_tersoff1988.approx_equal(res_tersoff1988)) {
     cout << "OK";
   } else {
-    cout << "mismatch!  " << res_tersoff1988.energy << " <-> " << new_tersoff1988.energy;
+    cout << "mismatch!  expected: " << res_tersoff1988.energy << "   got: " << new_tersoff1988.energy;
   }
   cout << endl;
 
-  // Set to Tersoff PRB39 1989 (all types Si)
-  {
-  const unsigned nspec = comp.get_number_of_particle_types();
-  for (unsigned i = 0; i < nspec; ++i) {
-  for (unsigned j = 0; j < nspec; ++j) {
-  for (unsigned k = 0; k < nspec; ++k) {
-  const unsigned idx2 = i*nspec + j; // we know the memory layout of the params.
-  const unsigned idx3 = i*nspec*nspec + j*nspec + k;
-  comp.set_parameter("A", idx2, 1830.8, false);
-  comp.set_parameter("B", idx2, 471.18, false);
-  comp.set_parameter("lambda1", idx2, 2.4799, false);
-  comp.set_parameter("lambda2", idx2, 1.7322, false);
-  comp.set_parameter("beta", idx2, 1.1e-06, false);
-  comp.set_parameter("n", idx2, 0.78734, false);
-  comp.set_parameter("lambda3", idx3, 0.0, false);
-  comp.set_parameter("m", idx3, 3, false);
-  comp.set_parameter("gamma", idx3, 1.0, false);
-  comp.set_parameter("c", idx3, 100390.0, false);
-  comp.set_parameter("d", idx3, 16.217, false);
-  comp.set_parameter("h", idx3, -0.59825, false);
-  comp.set_parameter("Rc", idx3, 2.85, false);
-  comp.set_parameter("Dc", idx3, 0.15, true);
-  }}}
-  }
+  // Set Si to Tersoff PRB39 1989
+  comp.set_parameter("A", "Si", "Si", 1830.8, false);
+  comp.set_parameter("B", "Si", "Si", 471.18, false);
+  comp.set_parameter("lambda1", "Si", "Si", 2.4799, false);
+  comp.set_parameter("lambda2", "Si", "Si", 1.7322, false);
+  comp.set_parameter("beta", "Si", "Si", 1.1e-06, false);
+  comp.set_parameter("n", "Si", "Si", 0.78734, false);
+  comp.set_parameter("lambda3", "Si", "Si", "Si", 0.0, false);
+  comp.set_parameter("m", "Si", "Si", "Si", 3, false);
+  comp.set_parameter("gamma", "Si", "Si", "Si", 1.0, false);
+  comp.set_parameter("c", "Si", "Si", "Si", 100390.0, false);
+  comp.set_parameter("d", "Si", "Si", "Si", 16.217, false);
+  comp.set_parameter("h", "Si", "Si", "Si", -0.59825, false);
+  comp.set_parameter("Rc", "Si", "Si", "Si", 2.85, false);
+  comp.set_parameter("Dc", "Si", "Si", "Si", 0.15, true);
   comp.update_neighbor_list();
   AllResults new_tersoff1989 = compute(comp);
   cout << "Tersoff PRB39 1989: ";
   if (new_tersoff1989.approx_equal(res_tersoff1989)) {
     cout << "OK";
   } else {
-    cout << "mismatch!  " << res_tersoff1989.energy << " <-> " << new_tersoff1989.energy;
+    cout << "mismatch!  expected: " << res_tersoff1989.energy << "   got: " << new_tersoff1989.energy;
   }
   cout << endl;
 
-  // Set to Erhart/Albe (all types Si)
-  {
-  const unsigned nspec = comp.get_number_of_particle_types();
-  for (unsigned i = 0; i < nspec; ++i) {
-  for (unsigned j = 0; j < nspec; ++j) {
-  for (unsigned k = 0; k < nspec; ++k) {
-  const unsigned idx2 = i*nspec + j; // we know the memory layout of the params.
-  const unsigned idx3 = i*nspec*nspec + j*nspec + k;
-  comp.set_parameter("A", idx2, 2145.7128, false);
-  comp.set_parameter("B", idx2, 219.521624, false);
-  comp.set_parameter("lambda1", idx2, 2.83318929, false);
-  comp.set_parameter("lambda2", idx2, 1.53810493, false);
-  comp.set_parameter("beta", idx2, 1.0, false);
-  comp.set_parameter("n", idx2, 1.0, false);
-  comp.set_parameter("lambda3", idx3, 0.0, false);
-  comp.set_parameter("m", idx3, 1, false);
-  comp.set_parameter("gamma", idx3, 0.114354, false);
-  comp.set_parameter("c", idx3, 2.00494, false);
-  comp.set_parameter("d", idx3, 0.81472, false);
-  comp.set_parameter("h", idx3, -0.259, false);
-  comp.set_parameter("Rc", idx3, 2.82, false);
-  comp.set_parameter("Dc", idx3, 0.14, true);
-  }}}
-  }
+  // Set Si to Erhart/Albe
+  comp.set_parameter("A", "Si", "Si", 2145.7128, false);
+  comp.set_parameter("B", "Si", "Si", 219.521624, false);
+  comp.set_parameter("lambda1", "Si", "Si", 2.83318929, false);
+  comp.set_parameter("lambda2", "Si", "Si", 1.53810493, false);
+  comp.set_parameter("beta", "Si", "Si", 1.0, false);
+  comp.set_parameter("n", "Si", "Si", 1.0, false);
+  comp.set_parameter("lambda3", "Si", "Si", "Si", 0.0, false);
+  comp.set_parameter("m", "Si", "Si", "Si", 1, false);
+  comp.set_parameter("gamma", "Si", "Si", "Si", 0.114354, false);
+  comp.set_parameter("c", "Si", "Si", "Si", 2.00494, false);
+  comp.set_parameter("d", "Si", "Si", "Si", 0.81472, false);
+  comp.set_parameter("h", "Si", "Si", "Si", -0.259, false);
+  comp.set_parameter("Rc", "Si", "Si", "Si", 2.82, false);
+  comp.set_parameter("Dc", "Si", "Si", "Si", 0.14, true);
   comp.update_neighbor_list();
   AllResults new_erhart2005 = compute(comp);
   cout << "Erhart/Albe 2005  : ";
   if (new_erhart2005.approx_equal(res_erhart2005)) {
     cout << "OK";
   } else {
-    cout << "mismatch!  " << res_erhart2005.energy << " <-> " << new_erhart2005.energy;
+    cout << "mismatch!  expected: " << res_erhart2005.energy << "   got: " << new_erhart2005.energy;
   }
   cout << endl;
 }

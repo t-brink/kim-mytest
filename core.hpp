@@ -590,7 +590,7 @@ namespace mytest {
         throw std::runtime_error("unknown type name");
     }
 
-    /** Get number of particle types. */
+    /** Get number of particle types in the box. */
     unsigned get_number_of_particle_types() {
       return partcl_type_codes.size();
     }
@@ -803,6 +803,8 @@ namespace mytest {
 
     /** Change model parameter.
 
+        Neighbor lists will not be updated automatically.
+
         @param param_name KIM name of the free parameter.
         @param index Index indicating which element of the
                      parameter array to access.
@@ -813,6 +815,7 @@ namespace mytest {
                       reinit = true. Setting it to false can be used
                       when updating several parameters in a row to
                       save computation time. Optional, default is @c true.
+                      If true, the cutoff will also be updated from KIM.
     */
     void set_parameter(const std::string& param_name,
                        const unsigned index,
@@ -820,6 +823,8 @@ namespace mytest {
 
     /** Change model parameter.
 
+        Neighbor lists will not be updated automatically.
+
         @param param_name KIM name of the free parameter.
         @param index Index indicating which element of the
                      parameter array to access.
@@ -830,10 +835,121 @@ namespace mytest {
                       reinit = true. Setting it to false can be used
                       when updating several parameters in a row to
                       save computation time. Optional, default is @c true.
+                      If true, the cutoff will also be updated from KIM.
     */
     void set_parameter(const std::string& param_name,
                        const unsigned index,
                        int value, bool reinit = true);
+
+    /** Change model parameter.
+
+        Neighbor lists will not be updated automatically.
+
+        This method assumes that the parameter is a N*N row-major
+        array, where N is the number of supported species. It also
+        assumes that the species code can be used to index into that
+        array.
+
+        @param param_name KIM name of the free parameter.
+        @param species1 The element name for i.
+        @param species2 The element name for j.
+        @param value The new value (must match the type of the
+                     parameter).
+        @param reinit The new parameter may not actually be used or
+                      used correctly until this method was called with
+                      reinit = true. Setting it to false can be used
+                      when updating several parameters in a row to
+                      save computation time. Optional, default is @c true.
+                      If true, the cutoff will also be updated from KIM.
+    */
+    void set_parameter(const std::string& param_name,
+                       const std::string& species1,
+                       const std::string& species2,
+                       double value, bool reinit = true);
+
+    /** Change model parameter.
+
+        Neighbor lists will not be updated automatically.
+
+        This method assumes that the parameter is a N*N*N row-major
+        array, where N is the number of supported species. It also
+        assumes that the species code can be used to index into that
+        array.
+
+        @param param_name KIM name of the free parameter.
+        @param species1 The element name for i.
+        @param species2 The element name for j.
+        @param species3 The element name for k.
+        @param value The new value (must match the type of the
+                     parameter).
+        @param reinit The new parameter may not actually be used or
+                      used correctly until this method was called with
+                      reinit = true. Setting it to false can be used
+                      when updating several parameters in a row to
+                      save computation time. Optional, default is @c true.
+                      If true, the cutoff will also be updated from KIM.
+    */
+    void set_parameter(const std::string& param_name,
+                       const std::string& species1,
+                       const std::string& species2,
+                       int value, bool reinit = true);
+
+    /** Change model parameter.
+
+        Neighbor lists will not be updated automatically.
+
+        This method assumes that the parameter is a N*N*N row-major
+        array, where N is the number of supported species. It also
+        assumes that the species code can be used to index into that
+        array.
+
+        @param param_name KIM name of the free parameter.
+        @param species1 The element name for i.
+        @param species2 The element name for j.
+        @param species3 The element name for k.
+        @param value The new value (must match the type of the
+                     parameter).
+        @param reinit The new parameter may not actually be used or
+                      used correctly until this method was called with
+                      reinit = true. Setting it to false can be used
+                      when updating several parameters in a row to
+                      save computation time. Optional, default is @c true.
+                      If true, the cutoff will also be updated from KIM.
+    */
+    void set_parameter(const std::string& param_name,
+                       const std::string& species1,
+                       const std::string& species2,
+                       const std::string& species3,
+                       double value, bool reinit = true);
+
+    /** Change model parameter.
+
+        Neighbor lists will not be updated automatically.
+
+        This method assumes that the parameter is a N*N*N row-major
+        array, where N is the number of supported species. It also
+        assumes that the species code can be used to index into that
+        array.
+
+        @param param_name KIM name of the free parameter.
+        @param species1 The element name for i.
+        @param species2 The element name for j.
+        @param species3 The element name for k.
+        @param value The new value (must match the type of the
+                     parameter).
+        @param reinit The new parameter may not actually be used or
+                      used correctly until this method was called with
+                      reinit = true. Setting it to false can be used
+                      when updating several parameters in a row to
+                      save computation time. Optional, default is @c true.
+                      If true, the cutoff will also be updated from KIM.
+    */
+    void set_parameter(const std::string& param_name,
+                       const std::string& species1,
+                       const std::string& species2,
+                       const std::string& species3,
+                       int value, bool reinit = true);
+
 
     int get_parameter_int(const std::string& param_name,
                           const unsigned index);
@@ -1245,9 +1361,45 @@ namespace mytest {
                                std::vector<double>& grad,
                                void* f_data);
 
+    /** Find parameter object for given parameter name. */
+    const FreeParam& get_param_obj(const std::string& param_name) const {
+      const auto it = free_parameter_map.find(param_name);
+      if (it == free_parameter_map.end())
+        throw std::runtime_error("Unknown free parameter: " + param_name);
+      return it->second;
+    }
+
+    /** Assuming a N*N array, get flat index for i,j
+
+        @param i Outer index.
+        @param j Inner index.
+        @param size Size of the flat array.
+     */
+    static unsigned conv_index(unsigned i, unsigned j, unsigned size) {
+      const unsigned n = std::sqrt(size);
+      if (n*n != size)
+        throw std::runtime_error("\"size\" does not belong to a N*N array.");
+      return i*n + j;
+    }
+
+    /** Assuming a N*N*N array, get flat index for i,j,k
+
+        @param i Outer index.
+        @param j "Middle" index.
+        @param k Inner index.
+        @param size Size of the flat array.
+     */
+    static unsigned conv_index(unsigned i, unsigned j, unsigned k,
+                               unsigned size) {
+      const unsigned n = std::cbrt(size);
+      if (n*n*n != size)
+        throw std::runtime_error("\"size\" does not belong to a N*N*N array.");
+      return i*n*n + j*n + k;
+    }
+
     /** set_parameter() implementation. */
     template<typename T>
-    void set_parameter_impl(const std::string& param_name,
+    void set_parameter_impl(const FreeParam& param,
                             const unsigned index,
                             T value, bool reinit);
 

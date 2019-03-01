@@ -883,6 +883,7 @@ Compute::~Compute() {
 void Compute::compute() {
   // Reset arrays to zero. Dunno if needed, but with ghost atoms I am
   // unsure.
+  /*
   if (has_forces)
     for (unsigned i = 0; i < forces.size(); ++i)
       forces[i] = 0;
@@ -892,6 +893,7 @@ void Compute::compute() {
   if (has_particleVirial)
     for (unsigned i = 0; i < particleVirial.size(); ++i)
       particleVirial[i] = 0;
+  */
   // Compute.
   const int error = model->Compute(compute_arguments);
   if (error)
@@ -1014,26 +1016,21 @@ void Compute::update_neighbor_list(bool force_ptr_update) {
 }
 
 template<typename T>
-void Compute::set_parameter_impl(const string& param_name,
+void Compute::set_parameter_impl(const FreeParam& param,
                                  const unsigned index,
                                  T value, bool reinit) {
   // Check if the model supports reinit.
   if (!has_reinit)
     throw runtime_error("model does not support changing parameters.");
-  // Get parameter data.
-  const auto it = free_parameter_map.find(param_name);
-  if (it == free_parameter_map.end())
-    throw runtime_error("Unknown free parameter: " + param_name);
-  const FreeParam& param = it->second;
   // Check parameter type.
   if (param.data_type == KIM::DATA_TYPE::Integer
       &&
       !is_same<T, int>::value)
-    throw runtime_error("parameter \"" + param_name + "\" is an int!");
+    throw runtime_error("parameter \"" + param.name + "\" is an int!");
   else if (param.data_type == KIM::DATA_TYPE::Double
            &&
            !is_same<T, double>::value)
-    throw runtime_error("parameter \"" + param_name + "\" is a double!");
+    throw runtime_error("parameter \"" + param.name + "\" is a double!");
   // Check index.
   if (index >= param.size)
     throw runtime_error("index " + to_string(index) + " out of bounds [0; "
@@ -1047,20 +1044,72 @@ void Compute::set_parameter_impl(const string& param_name,
     error = model->ClearThenRefresh();
     if (error)
       throw runtime_error("KIM model ClearThenRefresh() returned an error");
+    // Get cutoff.
+    model->GetInfluenceDistance(&cutoff);
+    //TODO: if multiple neighbor lists supported, updated them, too    
   }
 }
 
 void Compute::set_parameter(const string& param_name,
                             const unsigned index,
                             double value, bool reinit) {
-  set_parameter_impl<double>(param_name, index, value, reinit);
+  set_parameter_impl<double>(get_param_obj(param_name), index, value, reinit);
 }
 
 void Compute::set_parameter(const string& param_name,
                             const unsigned index,
                             int value, bool reinit) {
-  set_parameter_impl<int>(param_name, index, value, reinit);
+  set_parameter_impl<int>(get_param_obj(param_name), index, value, reinit);
 }
+
+void Compute::set_parameter(const string& param_name,
+                            const string& species1,
+                            const string& species2,
+                            double value, bool reinit) {
+  const FreeParam& param = get_param_obj(param_name);
+  const unsigned index = conv_index(get_particle_type_code(species1),
+                                    get_particle_type_code(species2),
+                                    param.size);
+  set_parameter_impl<double>(param, index, value, reinit);
+}
+
+void Compute::set_parameter(const string& param_name,
+                            const string& species1,
+                            const string& species2,
+                            int value, bool reinit) {
+  const FreeParam& param = get_param_obj(param_name);
+  const unsigned index = conv_index(get_particle_type_code(species1),
+                                    get_particle_type_code(species2),
+                                    param.size);
+  set_parameter_impl<int>(param, index, value, reinit);
+}
+
+void Compute::set_parameter(const string& param_name,
+                            const string& species1,
+                            const string& species2,
+                            const string& species3,
+                            double value, bool reinit) {
+  const FreeParam& param = get_param_obj(param_name);
+  const unsigned index = conv_index(get_particle_type_code(species1),
+                                    get_particle_type_code(species2),
+                                    get_particle_type_code(species3),
+                                    param.size);
+  set_parameter_impl<double>(param, index, value, reinit);
+}
+
+void Compute::set_parameter(const string& param_name,
+                            const string& species1,
+                            const string& species2,
+                            const string& species3,
+                            int value, bool reinit) {
+  const FreeParam& param = get_param_obj(param_name);
+  const unsigned index = conv_index(get_particle_type_code(species1),
+                                    get_particle_type_code(species2),
+                                    get_particle_type_code(species3),
+                                    param.size);
+  set_parameter_impl<int>(param, index, value, reinit);
+}
+
 
 
 template<typename T>
