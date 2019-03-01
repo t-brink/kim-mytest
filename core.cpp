@@ -1220,8 +1220,10 @@ double Compute::optimize_positions(double ftol_abs, unsigned maxeval) {
 
 void Compute::switch_boxes(Compute& other) {
   // Check model.
+  /* I don't think I need this; the supported species are checked and that's it
   if (modelname_ != other.modelname_)
     throw runtime_error("KIM models do not match.");
+  */
   // Swap boxes.
   box_.swap(other.box_);
   // Reset KIM data on this object.
@@ -1238,6 +1240,23 @@ unique_ptr<Box> Compute::change_box(unique_ptr<Box> new_box) {
 
 
 void Compute::update_kim_after_box_change() {
+  // Check and update species.
+  partcl_type_codes.clear();
+  partcl_type_names.clear();
+  for (int i = 0; i < box_->types.extent(0); ++i) {
+    int species_supported;
+    int species_code;
+    // Get code from model.
+    const KIM::SpeciesName sn(box_->types(i));
+    const int error =
+      model->GetSpeciesSupportAndCode(sn, &species_supported, &species_code);
+    if (error || !species_supported)
+      throw runtime_error("Species \""
+                          + box_->types(i)
+                          + "\" from box is not supported by the model.");
+    partcl_type_codes[box_->types(i)] = species_code;
+    partcl_type_names[species_code] = box_->types(i);
+  }
   // Also force updating all pointers and resizing all output array since
   // the box changed.
   update_neighbor_list(true);

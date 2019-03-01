@@ -1140,9 +1140,6 @@ namespace mytest {
 
     /** Switch the contained Box objects between two Compute objects.
 
-        Both boxes must have the same KIM neighbor list type and use
-        the same KIM model.
-
         Will implicitly call update_neighbor_list() for both Compute
         objects.
 
@@ -1151,9 +1148,6 @@ namespace mytest {
     void switch_boxes(Compute& other);
 
     /** Store a new box in the object and return the old one.
-
-        Both boxes must have the same KIM neighbor list type. Neighbor
-        lists are not updated.
 
         Will implicitly call update_neighbor_list().
 

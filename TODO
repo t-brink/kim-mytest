@@ -4,19 +4,29 @@
 
 ** Port to cmake [DONE, nice and easy]
 
-** adapt core.?pp
+** adapt core.?pp [mostly done]
+
+*** implement dE/dr checks
+
+*** implement writing parameters out
 
 ** check if other files need changes
 
 ** the switch_boxes() and change_box() methods of Compute must check if
    the KIM model supports the species and perhaps update the species
-   name <-> code mappings!
+   name <-> code mappings! [DONE]
 
 ** document DSL [started]
 
 ** adapt run_tests.py for DSL changes (no neighbor mode any more) [DONE]
 
 ** run tests
+
+*** changing parameters buggy
+
+*** some crashes
+
+*** dE/dr checks missing
 
 
 
