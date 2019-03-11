@@ -36,6 +36,7 @@ struct AllResults {
   vector<double> particle_energy;
   vector<double> force;
   Voigt6<double> virial;
+  Voigt6<double> virial_from_dEdr;
   vector<Voigt6<double>> particle_virial;
 
   bool approx_equal(const AllResults&, double);
@@ -72,6 +73,12 @@ bool AllResults::approx_equal(const AllResults& other, double eps = 1e-6) {
       return false;
     }
   }
+  for (unsigned dim = 0; dim < 6; ++dim) {
+    if (abs(virial_from_dEdr(dim) - other.virial_from_dEdr(dim)) > eps) {
+      cout << "VIRIAL FROM dE/dr ";
+      return false;
+    }
+  }
   if (particle_virial.size() != other.particle_virial.size()) {
     cout << "ATOM VIRIAL SIZE ";
     return false;
@@ -94,6 +101,7 @@ AllResults compute(Compute& comp) {
   res.energy = comp.get_energy();
   for (unsigned dim = 0; dim < 6; ++dim) {
     res.virial(dim) = comp.get_virial()(dim);
+    res.virial_from_dEdr(dim) = comp.get_virial_from_dEdr()(dim);
   }
   for (unsigned i = 0; i < natoms; ++i) {
     res.particle_energy.push_back(comp.get_energy(i));
