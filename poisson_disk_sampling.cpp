@@ -206,9 +206,9 @@ std::unique_ptr<Box> Box::random_box(double a, double b, double c,
                                      bool periodic_b,
                                      bool periodic_c,
                                      double min_dist,
-                                     const std::string& atomtype,
-                                     const std::string& name,
-                                     std::mt19937& rng) {
+                                     const string& atomtype,
+                                     const string& name,
+                                     mt19937& rng) {
   vector<double> positions;
   poisson_disk_sampling(a, b, c, min_dist, positions, rng);
   unsigned natoms = positions.size() / 3;
@@ -219,6 +219,35 @@ std::unique_ptr<Box> Box::random_box(double a, double b, double c,
     (*coords)(i, 1) = positions[i*3 + 1];
     (*coords)(i, 2) = positions[i*3 + 2];
     (*types)(i) = atomtype;
+  }
+  return make_unique<Box>(Vec3D<double>(a, 0, 0),
+                          Vec3D<double>(0, b, 0),
+                          Vec3D<double>(0, 0, c),
+                          periodic_a, periodic_b, periodic_c,
+                          move(coords), move(types),
+                          name);
+}
+
+std::unique_ptr<Box> Box::random_box(double a, double b, double c,
+                                     bool periodic_a,
+                                     bool periodic_b,
+                                     bool periodic_c,
+                                     double min_dist,
+                                     const vector<string>& atomtypes,
+                                     const string& name,
+                                     mt19937& rng) {
+  vector<double> positions;
+  poisson_disk_sampling(a, b, c, min_dist, positions, rng);
+  unsigned natoms = positions.size() / 3;
+  auto coords = make_unique< Array2D<double> >(natoms, 3);
+  auto types = make_unique< Array1DInit<string> >(natoms);
+  // randomly choose types each time.
+  uniform_int_distribution<unsigned> typerange(0, atomtypes.size()-1);
+  for (unsigned i = 0; i < natoms; ++i) {
+    (*coords)(i, 0) = positions[i*3 + 0];
+    (*coords)(i, 1) = positions[i*3 + 1];
+    (*coords)(i, 2) = positions[i*3 + 2];
+    (*types)(i) = atomtypes[typerange(rng)];
   }
   return make_unique<Box>(Vec3D<double>(a, 0, 0),
                           Vec3D<double>(0, b, 0),

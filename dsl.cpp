@@ -126,6 +126,7 @@ void mytest::parse(string command,
       cout << "Not enough arguments." << endl;
       return;
     }
+    vector<string> atomtypes(tokens.begin()+6, tokens.end());
     try {
       unique_ptr<Box> p =
         Box::random_box(10.0, 10.0, 10.0,
@@ -133,7 +134,7 @@ void mytest::parse(string command,
                         to_bool(tokens[3]), // periodic b
                         to_bool(tokens[4]), // periodic c
                         to_double(tokens[5]), // min_dist between atoms
-                        tokens[6], // Atom type (TODO: more than one)    
+                        atomtypes, // Atom types
                         tokens[1], // name
                         _DSL_RNG_);
       boxes[tokens[1]] = move(p);

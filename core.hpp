@@ -128,7 +128,7 @@ namespace mytest {
 
     /** Create a randomly filled box
 
-        @todo: support more than one type and choose randomly!    
+        @todo: document params
 
      */
     static
@@ -138,6 +138,21 @@ namespace mytest {
                                     bool periodic_c,
                                     double min_dist,
                                     const std::string& atomtype,
+                                    const std::string& name,
+                                    std::mt19937& rng);
+
+    /** Create a randomly filled box with random types from list
+
+        @todo: document params
+
+     */
+    static
+    std::unique_ptr<Box> random_box(double a, double b, double c,
+                                    bool periodic_a,
+                                    bool periodic_b,
+                                    bool periodic_c,
+                                    double min_dist,
+                                    const std::vector<std::string>& atomtypes,
                                     const std::string& name,
                                     std::mt19937& rng);
 

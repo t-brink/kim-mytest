@@ -26,10 +26,11 @@ random_box
 random_box <name>
            <periodic a?> <periodic b?> <periodic c?>
            <minimum distance between atoms>
-           <atom type>
+           <atom type> [<atom type> ...]
 
 Create a 10x10x10 box randomly filled with atoms with a minimum
-distance between them.
+distance between them. If more than one atom type is provided,
+they are chosen randomly for the atoms.
 
 
 copy_box
