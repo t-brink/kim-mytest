@@ -552,7 +552,12 @@ namespace mytest {
                    the pointer.
         @param modelname KIM model identifier.
      */
-    Compute(std::unique_ptr<Box> box, const std::string& modelname);
+    Compute(std::unique_ptr<Box> box, const std::string& modelname,
+            KIM::LengthUnit length_unit = KIM::LENGTH_UNIT::A,
+            KIM::EnergyUnit energy_unit = KIM::ENERGY_UNIT::eV,
+            KIM::ChargeUnit charge_unit = KIM::CHARGE_UNIT::e,
+            KIM::TemperatureUnit temperature_unit = KIM::TEMPERATURE_UNIT::K,
+            KIM::TimeUnit time_unit = KIM::TIME_UNIT::ps);
 
     /** Destructor.
 
@@ -1308,6 +1313,14 @@ namespace mytest {
     */
     void scale_box(double factor_a, double factor_b, double factor_c) {
       box_->scale(factor_a, factor_b, factor_c, partcl_type_codes);
+    }
+
+    /** Scale the box.
+
+        @see Box::scale
+    */
+    void scale_box(double factor) {
+      box_->scale(factor, partcl_type_codes);
     }
 
   private:

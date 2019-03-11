@@ -644,21 +644,24 @@ Vec3D<unsigned> Box::calc_number_of_ghost_shells(double cutoff) const {
 // Compute /////////////////////////////////////////////////////////////
 
 
-Compute::Compute(unique_ptr<Box> box, const string& modelname)
+Compute::Compute(unique_ptr<Box> box, const string& modelname,
+                 KIM::LengthUnit length_unit,
+                 KIM::EnergyUnit energy_unit,
+                 KIM::ChargeUnit charge_unit,
+                 KIM::TemperatureUnit temperature_unit,
+                 KIM::TimeUnit time_unit)
   : box_(move(box)), modelname_(modelname)
 {
-  // TODO: maybe try supporting different units to test the unit conversion!   
-
   int error;
 
   // Create KIM model. /////////////////////////////////////////////////
   int requested_units_accepted;
   error = KIM::Model::Create(KIM::NUMBERING::zeroBased, // TODO: test this??    
-                             KIM::LENGTH_UNIT::A,
-                             KIM::ENERGY_UNIT::eV,
-                             KIM::CHARGE_UNIT::e,
-                             KIM::TEMPERATURE_UNIT::K,
-                             KIM::TIME_UNIT::ps,
+                             length_unit,
+                             energy_unit,
+                             charge_unit,
+                             temperature_unit,
+                             time_unit,
                              modelname,
                              &requested_units_accepted,
                              &model);

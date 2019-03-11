@@ -56,3 +56,14 @@ set_target_properties(test_switch_params PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 target_link_libraries(test_switch_params kim-api nlopt)
+
+
+
+add_executable(test_unit_conv core.cpp elastic.cpp dsl.cpp
+                              test_unit_conv.cpp
+                              numer_forces.cpp poisson_disk_sampling.cpp)
+set_target_properties(test_unit_conv PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+)
+target_link_libraries(test_unit_conv kim-api nlopt)
