@@ -109,33 +109,40 @@ with tempfile.TemporaryDirectory() as tmpdir:
     def ex(cmd):
         proc.stdin.write(cmd + "\n")
 
-    # Create random box only once per element.
+    # Create random box only once per element pair.
     rand_boxes = {}
     if "random" in lattices:
-        for i in itertools.product(sorted(elements),
-                                   (True, False), (True, False), (True, False)):
-            elem, pbc_x, pbc_y, pbc_z = i
+        for i in itertools.product(
+                itertools.combinations_with_replacement(sorted(elements), 2),
+                (True, False), (True, False), (True, False)):
+            (elem1, elem2), pbc_x, pbc_y, pbc_z = i
             h_i = hash(i)
             boxname = "randbox-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
             rand_boxes[i] = boxname
-            min_dist = lattices["random"][elem]
-            ex("random_box {} {} {} {} {} {}".format(
-                boxname, pbc_x, pbc_y, pbc_z, min_dist, elem
+            min_dist = max(lattices["random"][elem1], # TODO: a bit dumb!
+                           lattices["random"][elem2])
+            ex("random_box {} {} {} {} {} {} {}".format(
+                boxname, pbc_x, pbc_y, pbc_z, min_dist, elem1, elem2
             ))
 
     firstrun = True
-    combinations = list(itertools.product(sorted(commands),
-                                          sorted(lattices),
-                                          sorted(elements),
-                                          # PBC
-                                          (True, False),
-                                          (True, False),
-                                          (True, False),
-                                          # Cubic        del atom?
-                                          (True, False), (True, False),
-                                          (-shear, 0, shear),
-                                          (-shear, 0, shear),
-                                          (-shear, 0, shear)))
+    combinations = list(itertools.product(
+        sorted(commands),
+        sorted(lattices),
+        itertools.combinations_with_replacement(sorted(elements), 2),
+        # PBC
+        (True, False),
+        (True, False),
+        (True, False),
+        # Cubic        del atom?
+        (True, False), (True, False),
+        (-shear, 0, shear),
+        (-shear, 0, shear),
+        (-shear, 0, shear))
+    )
+    # Sort out non-random lattices with two different atom types.
+    combinations = [i for i in combinations
+                    if not (i[1] != "random" and i[2][0] != i[2][1])]
     if args.only_fast:
         # Skip numer_forces_deriv for random boxes: too slow
         combinations = [i for i in combinations
@@ -144,8 +151,12 @@ with tempfile.TemporaryDirectory() as tmpdir:
     niter = len(combinations)
     last_batch = ()
     for i, combi in enumerate(combinations):
-        (command, lattice, elem, pbc_x, pbc_y, pbc_z, cubic,
+        (command, lattice, (elem, elem2), pbc_x, pbc_y, pbc_z, cubic,
          del_atom, shear_yz, shear_xz, shear_xy) = combi
+        if elem != elem2 and lattice != "random":
+            print("{} != {} for lattice {}".format(elem, elem2, lattice),
+                  file=sys.stderr)
+            os._exit(0)
         repeat = commands[command]
         latconst = lattices[lattice][elem]
         new_batch = (command, lattice, elem)
@@ -157,7 +168,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
         h_i = hash(combi)
         boxname = "box-" + ("p" if h_i >= 0 else "m") + "{:x}".format(abs(h_i))
         if lattice == "random":
-            randboxname = rand_boxes[(elem, pbc_x, pbc_y, pbc_z)]
+            randboxname = rand_boxes[((elem, elem2), pbc_x, pbc_y, pbc_z)]
             ex("copy_box {} {}".format(randboxname, boxname))
         else:
             ex("box {} {} {} {} {} {} {} {} {}".format(
@@ -179,7 +190,8 @@ with tempfile.TemporaryDirectory() as tmpdir:
         p = lambda pbc: "P" if pbc else "O"
         boxinfo = ("{:2s} {:7s} {:1s} {:1s} {:1s} {:7s} "
                    "1 1 1 {:+5.2f} {:+5.2f} {:+5.2f}{}"
-                   "".format(elem, lattice,
+                   "".format((elem if elem == elem2 else elem+"-"+elem2),
+                             lattice,
                              p(pbc_x), p(pbc_y), p(pbc_z),
                              ("cubic" if cubic else "minimal"),
                              shear_yz, shear_xz, shear_xy,
