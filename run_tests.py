@@ -54,7 +54,8 @@ shear = 0.05
 commands = {"numer_forces_deriv": "1 1 1",
             "diff_total_energy_vs_particle_energy": "3 3 3",
             "diff_total_virial_vs_particle_virial": "3 3 3",
-            "diff_total_virial_vs_virial_from_forces": "3 3 3"}
+            "diff_total_virial_vs_virial_from_forces": "3 3 3",
+            "diff_total_virial_vs_virial_from_dEdr": "3 3 3"}
 
 LAMMPS_TEMPLATE = """
 units metal
@@ -338,7 +339,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     ########################################################################
     # Test the boxes.                                                      #
     ########################################################################
-    print("Comparing models results to LAMMPS results...", end=" ",
+    print("Comparing model's results to LAMMPS results...", end=" ",
           file=sys.stderr, flush=True)
     start = time.time()
 

@@ -794,6 +794,78 @@ void mytest::parse(string command,
            "",
            virial_forces.zz);
     */
+  } else if (tokens[0] == "diff_total_virial_vs_virial_from_dEdr") {
+    if (tokens.size() != 2) {
+      cout << "Wrong number of arguments." << endl;
+      return;
+    }
+    const auto iter = computes.find(tokens[1]);
+    if (iter == computes.end()) {
+      cout << "Unknown computer: " << tokens[1] << endl;
+      return;
+    }
+    try {
+      iter->second.compute();
+    } catch (const exception& e) {
+      cout << e.what() << endl;
+      return;
+    }
+    Voigt6<double> virial = iter->second.get_virial();
+    Voigt6<double> virial_dEdr = iter->second.get_virial_from_dEdr();
+    double
+      dxx = virial_dEdr.xx - virial.xx,
+      dxy = virial_dEdr.xy - virial.xy,
+      dxz = virial_dEdr.xz - virial.xz,
+      dyy = virial_dEdr.yy - virial.yy,
+      dyz = virial_dEdr.yz - virial.yz,
+      dzz = virial_dEdr.zz - virial.zz;
+    bool too_large = (abs(dxx) > 1e-5)
+                     || (abs(dxy) > 1e-5)
+                     || (abs(dxz) > 1e-5)
+                     || (abs(dyy) > 1e-5)
+                     || (abs(dyz) > 1e-5)
+                     || (abs(dzz) > 1e-5);
+    cout << "Virial diff:";
+    if (too_large)
+      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+    cout << endl;
+    printf("  %+16.10f %+16.10f %+16.10f", dxx, dxy, dxz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    printf("  %16s %+16.10f %+16.10f", "", dyy, dyz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    printf("  %16s %16s %+16.10f", "", "", dzz);
+    if (too_large) printf("     !!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    printf("\n");
+    /*
+    cout << "Virial model:" << endl;
+    printf("  %+16.10f %+16.10f %+16.10f\n",
+           virial.xx,
+           virial.xy,
+           virial.xz);
+    printf("  %16s %+16.10f %+16.10f\n",
+           "",
+           virial.yy,
+           virial.yz);
+    printf("  %16s %16s %+16.10f\n",
+           "",
+           "",
+           virial.zz);
+    cout << "Virial dEdr:" << endl;
+    printf("  %+16.10f %+16.10f %+16.10f\n",
+           virial_dEdr.xx,
+           virial_dEdr.xy,
+           virial_dEdr.xz);
+    printf("  %16s %+16.10f %+16.10f\n",
+           "",
+           virial_dEdr.yy,
+           virial_dEdr.yz);
+    printf("  %16s %16s %+16.10f\n",
+           "",
+           "",
+           virial_dEdr.zz);
+    */
   } else if (tokens[0] == "print") {
     if (command.size() > 6)
       cout << command.substr(6) << flush;

@@ -761,7 +761,7 @@ namespace mytest {
     };
 
     /** Get the force of atom i, component dim */
-    double get_force(unsigned i, unsigned dim) {
+    double get_force(unsigned i, unsigned dim) const {
       if (dim >= 3)
         throw std::runtime_error("invalid dim");
       if (i >= box_->natoms)
@@ -799,6 +799,16 @@ namespace mytest {
                             global_virial_from_forces_yz,
                             global_virial_from_forces_xz,
                             global_virial_from_forces_xy);
+    }
+
+    /** Get the global virial tensor computed using process_dEdr.
+
+        This can be used to verify the global virial tensor from the
+        model and process_dEdr.
+
+     */
+    Voigt6<double> get_virial_from_dEdr() const {
+      return virial_from_dEdr;
     }
 
     /** Change model parameter.
@@ -1293,14 +1303,14 @@ namespace mytest {
     int nall_kim; // KIM wants an int for the number of atoms, so we
                   // maintain a copy :-/
     // Inputs and outputs supported by the model.
-    bool has_reinit; // TODO: not handled, yet   
+    bool has_reinit;
     bool has_write_params; // TODO: not handled, yet   
     bool has_energy;
     bool has_particleEnergy;
     bool has_forces;
     bool has_virial;
     bool has_particleVirial;
-    bool has_process_dEdr; // TODO: not handled/used, yet     
+    bool has_process_dEdr;
     // Model output (constant).
     std::map<std::string,int> partcl_type_codes;
     std::map<int,std::string> partcl_type_names;
@@ -1309,6 +1319,7 @@ namespace mytest {
     // Computation results, fixed length.
     double energy;
     Voigt6<double> virial;
+    Voigt6<double> virial_from_dEdr;
     // Computation results, length as function of number of atoms +
     // ghost atoms.
     std::vector<double> forces;
@@ -1347,6 +1358,24 @@ namespace mytest {
                          const int i,
                          int * const n_neighs,
                          const int ** const neighlist);
+
+    /** Handle dE/dr. Called from the kim model.
+
+        @param compute_ptr The Compute object
+        @param dEdr        Value of dEdr.
+        @param r           Pair distance.
+        @param vec_r       Pair distance vector.
+        @param i           Central atom index.
+        @param j           Bonded atom index.
+
+        @return Status.
+     */
+    static int process_dEdr(void * const compute_ptr,
+                            const double dEdr,
+                            const double r,
+                            const double * const vec_r,
+                            const int i,
+                            const int j);
 
     /** Objective function for optimizing the box.
 

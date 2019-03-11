@@ -825,9 +825,16 @@ Compute::Compute(unique_ptr<Box> box, const string& modelname)
                                                     KIM::LANGUAGE_NAME::cpp,
                                                     (KIM::Function*) &get_neigh,
                                                     this);
-    // TODO: process_dEdr   
+    } else if (compute_callback_name
+               == KIM::COMPUTE_CALLBACK_NAME::ProcessDEDrTerm) {
+      error =
+        compute_arguments->SetCallbackPointer(compute_callback_name,
+                                              KIM::LANGUAGE_NAME::cpp,
+                                              (KIM::Function*) &process_dEdr,
+                                              this);
+      has_process_dEdr = true;
     } else {
-      //TODO complain if required
+      //TODO complain if required  
     }
     if (error)
       throw runtime_error("KIM model->SetCallbackPointer() failed for "
@@ -894,6 +901,8 @@ void Compute::compute() {
     for (unsigned i = 0; i < particleVirial.size(); ++i)
       particleVirial[i] = 0;
   */
+  for (unsigned dim = 0; dim < 6; ++dim)
+    virial_from_dEdr(dim) = 0.0;
   // Compute.
   const int error = model->Compute(compute_arguments);
   if (error)
@@ -973,6 +982,26 @@ int Compute::get_neigh(void * const compute_ptr,
 
   return 0;
 }
+
+
+int Compute::process_dEdr(void * const compute_ptr,
+                          const double dEdr,
+                          const double r,
+                          const double * const vec_r,
+                          const int i,
+                          const int j) {
+  Compute& c = *( (Compute *)compute_ptr );
+
+  // Compute global virial from dEdr.
+  const double v = dEdr / r;
+  for (unsigned ii = 0; ii < 3; ++ii)
+    for (unsigned jj = 0; jj < 3; ++jj)
+      c.virial_from_dEdr(ii,jj) +=
+        ((ii == jj) ? 1.0 : 0.5) * v * vec_r[ii] * vec_r[jj];
+
+  return 0;
+}
+
 
 void Compute::update_neighbor_list(bool force_ptr_update) {
   // TODO: For now the skin is 0.
