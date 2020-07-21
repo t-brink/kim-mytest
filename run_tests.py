@@ -47,7 +47,7 @@ pair_style tersoff
 pair_coeff * * {} {}
 """.format(lammps_potfile, " ".join(elements))
 
-lammps_cmd = ["/home/brink/bin/lmp_serial"]
+lammps_cmd = ["/home/t.brink/bin/lmp_serial"]
 
 shear = 0.05
 
