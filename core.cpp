@@ -450,7 +450,7 @@ void Box::update_ghosts(const map<string,int>& typemap) {
 
 
 
-unique_ptr<Box> Box::delete_atom(unsigned i, const string& name) {
+unique_ptr<Box> Box::delete_atom(unsigned i, const string& name) const {
   if (i >= natoms_)
     throw runtime_error("Deleting non-existant atom.");
   unsigned new_natoms = natoms_ - 1;
@@ -474,6 +474,42 @@ unique_ptr<Box> Box::delete_atom(unsigned i, const string& name) {
                           name);
 }
 
+
+
+unique_ptr<Box> Box::repeat(unsigned repeat_a,
+                            unsigned repeat_b,
+                            unsigned repeat_c,
+                            const std::string& name) const {
+  unsigned new_natoms = natoms_ * repeat_a * repeat_b * repeat_c;
+  unique_ptr< Array2D<double> > new_positions =
+    make_unique< Array2D<double> >(new_natoms, 3);
+  unique_ptr< Array1DInit<string> > new_types =
+    make_unique< Array1DInit<string> >(new_natoms);
+  unsigned new_idx = 0;
+  for (unsigned i = 0; i < repeat_a; ++i) {
+    for (unsigned j = 0; j < repeat_b; ++j) {
+      for (unsigned k = 0; k < repeat_c; ++k) {
+        Vec3D<double> offset(0.0, 0.0, 0.0);
+        offset += double(i) * a;
+        offset += double(j) * b;
+        offset += double(k) * c;
+        for (unsigned idx = 0; idx < natoms_; ++idx) {
+          for (unsigned dim = 0; dim < 3; ++dim) {
+            (*new_positions)(new_idx, dim) = positions(idx, dim) + offset[dim];
+          }
+          (*new_types)(new_idx) = types(idx);
+          ++new_idx;
+        }
+      }
+    }
+  }
+  return make_unique<Box>(a*double(repeat_a),
+                          b*double(repeat_b),
+                          c*double(repeat_c),
+                          periodic[0], periodic[1], periodic[2],
+                          move(new_positions), move(new_types),
+                          name);
+}
 
 
 double Box::calc_dist(int i, int j, double& dx, double& dy, double& dz) const {

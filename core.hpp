@@ -196,7 +196,7 @@ namespace mytest {
         @param new_name  Name for the new box.
 
      */
-    std::unique_ptr<Box> delete_atom(unsigned i, const std::string& name);
+    std::unique_ptr<Box> delete_atom(unsigned i, const std::string& name) const;
 
     /** Return unique_ptr to new box with atom i deleted.
 
@@ -205,8 +205,36 @@ namespace mytest {
         @param i         The atom that should be deleted.
 
      */
-    std::unique_ptr<Box> delete_atom(unsigned i) {
+    std::unique_ptr<Box> delete_atom(unsigned i) const {
       return delete_atom(i, name_);
+    }
+
+    /** Return unique_ptr to new box, repeated along the given directions.
+
+        @param repeat_a  Repeat this many times in a direction.
+        @param repeat_b  Repeat this many times in b direction.
+        @param repeat_c  Repeat this many times in c direction.
+        @param new_name  Name for the new box.
+
+    */
+    std::unique_ptr<Box> repeat(unsigned repeat_a,
+                                unsigned repeat_b,
+                                unsigned repeat_c,
+                                const std::string& name) const;
+
+    /** Return unique_ptr to new box, repeated along the given directions.
+
+        The new box will have the same name as the old one.
+
+        @param repeat_a  Repeat this many times in a direction.
+        @param repeat_b  Repeat this many times in b direction.
+        @param repeat_c  Repeat this many times in c direction.
+
+    */
+    std::unique_ptr<Box> repeat(unsigned repeat_a,
+                                unsigned repeat_b,
+                                unsigned repeat_c) const {
+      return repeat(repeat_a, repeat_b, repeat_c, name_);
     }
 
     // Public data /////////////////////////////////////////////////////

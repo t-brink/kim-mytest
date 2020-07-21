@@ -67,3 +67,13 @@ set_target_properties(test_unit_conv PROPERTIES
   CXX_STANDARD_REQUIRED ON
 )
 target_link_libraries(test_unit_conv kim-api nlopt)
+
+
+add_executable(test_benchmark core.cpp elastic.cpp dsl.cpp
+                              test_benchmark.cpp
+                              numer_forces.cpp poisson_disk_sampling.cpp)
+set_target_properties(test_benchmark PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+)
+target_link_libraries(test_benchmark kim-api nlopt)
