@@ -28,9 +28,10 @@ random_box <name>
            <minimum distance between atoms>
            <atom type> [<atom type> ...]
 
-Create a 10x10x10 box randomly filled with atoms with a minimum
-distance between them. If more than one atom type is provided,
-they are chosen randomly for the atoms.
+Create a box randomly filled with atoms with a minimum distance
+between them. The box is a cube with side length equal to five times
+the minimum distance. If more than one atom type is provided, they are
+chosen randomly for the atoms.
 
 
 copy_box
