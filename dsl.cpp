@@ -128,12 +128,14 @@ void mytest::parse(string command,
     }
     vector<string> atomtypes(tokens.begin()+6, tokens.end());
     try {
+      double min_dist = to_double(tokens[5]);
+      double boxsize = 5 * min_dist; // not to have too many atoms, order of 100
       unique_ptr<Box> p =
-        Box::random_box(10.0, 10.0, 10.0,
+        Box::random_box(boxsize, boxsize, boxsize,
                         to_bool(tokens[2]), // periodic a
                         to_bool(tokens[3]), // periodic b
                         to_bool(tokens[4]), // periodic c
-                        to_double(tokens[5]), // min_dist between atoms
+                        min_dist,  // min_dist between atoms
                         atomtypes, // Atom types
                         tokens[1], // name
                         _DSL_RNG_);
