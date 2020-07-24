@@ -23,6 +23,7 @@ from mmlib.formats import lammps
 parser = argparse.ArgumentParser()
 parser.add_argument("--only-fast", action="store_true", default=False)
 parser.add_argument("--verbose", action="store_true", default=False)
+parser.add_argument("--zbl", action="store_true", default=False)
 parser.add_argument("kim_model")
 parser.add_argument("potfile")
 parser.add_argument("lattices", nargs="+")
@@ -43,9 +44,10 @@ elem_map_reverse = {i: e
                     for i, e in enumerate(elements, 1)}
 
 lammps_model = """\
-pair_style tersoff
+pair_style tersoff{}
 pair_coeff * * {} {}
-""".format(lammps_potfile, " ".join(elements))
+""".format("/zbl" if args.zbl else "",
+           lammps_potfile, " ".join(elements))
 
 lammps_cmd = ["/home/t.brink/bin/lmp_serial"]
 

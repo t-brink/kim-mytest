@@ -2,4 +2,4 @@ Tersoff_LAMMPS_Tersoff_1988T2_Si__MO_245095684871_002 Tersoff_PRB37_1988_Si.ters
 Tersoff_LAMMPS_Tersoff_1989_SiC__MO_171585019474_002 Tersoff_PRB39_1989_CSi.tersoff diamond:Si:5.429 sc:Si:2.525 bcc:Si:3.043 fcc:Si:3.940 random:Si:1.8 diamond:C:3.85 sc:C:1.80 bcc:C:2.15 fcc:C:2.80 random:C:1.5
 Tersoff_LAMMPS_ErhartAlbe_2005_SiC__MO_903987585848_003 Tersoff_SiC_ErhartAlbe.params diamond:Si:5.429 sc:Si:2.525 bcc:Si:3.043 fcc:Si:3.940 random:Si:1.8 diamond:C:3.85 sc:C:1.80 bcc:C:2.15 fcc:C:2.80 random:C:1.5
 Tersoff_LAMMPS_AlbeNordlundAverback_2002_PtC__MO_500121566391_002 Albe_Nordlund_Averback_PtC.tersoff diamond:Pt:5.807 sc:Pt:2.652 bcc:Pt:3.192 fcc:Pt:3.992 random:Pt:2.0 diamond:C:3.85 sc:C:1.80 bcc:C:2.15 fcc:C:2.80 random:C:1.5
-Tersoff_LAMMPS_Devanathan_1998_SiC SiC.tersoff.zbl diamond:Si:5.429 sc:Si:2.525 bcc:Si:3.043 fcc:Si:3.940 random:Si:0.5 diamond:C:3.85 sc:C:1.80 bcc:C:2.15 fcc:C:2.80 random:C:0.5
+--zbl Tersoff_LAMMPS_Devanathan_1998_SiC SiC.tersoff.zbl diamond:Si:5.429 sc:Si:2.525 bcc:Si:3.043 fcc:Si:3.940 random:Si:0.8 diamond:C:3.85 sc:C:1.80 bcc:C:2.15 fcc:C:2.80 random:C:0.8
