@@ -340,6 +340,7 @@ void mytest::parse(string command,
     double max_err_energy = 0.0;
     double max_err_force = 0.0;
     double max_err_stress = 0.0;
+    double max_rel_stress = 0.0;
     // Compare.
     for (unsigned i = 0; i < natoms; ++i) {
       //
@@ -354,7 +355,10 @@ void mytest::parse(string command,
       Voigt6<double> v = iter->second.get_virial(i);
       for (unsigned dim = 0; dim < 6; ++dim) {
         double delta_v = abs(v(dim) - stresses(i,dim));
-        if (delta_v > max_err_stress) max_err_stress = delta_v;
+        if (delta_v > max_err_stress) {
+          max_err_stress = delta_v;
+          max_rel_stress = delta_v / stresses(i,dim);
+        }
       }
     }
     // Output.
@@ -376,7 +380,8 @@ void mytest::parse(string command,
       cout << "     !!!"; // just for grepping
     cout << endl;
     //
-    cout << "Maximum particle virial deviation: " << max_err_stress;
+    cout << "Maximum particle virial deviation: " << max_err_stress
+         << " (" << max_rel_stress*100 << "%)";
     if (has_err_stress)
       cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
     cout << endl;

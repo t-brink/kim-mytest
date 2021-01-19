@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2014,2017,2018,2019 Tobias Brink
+  Copyright (c) 2013,2014,2017,2018,2019,2020 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -1218,6 +1218,20 @@ double Compute::get_parameter_double(const string& param_name,
                                      const unsigned index) {
   return get_parameter_impl<double>(param_name, index);
 }
+
+
+// Write parameters in KIM form. ///
+
+void Compute::write_kim_parameters(const string& directory,
+                                   const string& name) const {
+  // Check if the model supports this.
+  if (!has_write_params)
+    throw runtime_error("model does not support writing parameters.");
+  int error = model->WriteParameterizedModel(directory, name);
+  if (error)
+    throw runtime_error("KIM model WriteParameterizedModel() returned an error");
+}
+
 
 
 // Fitting /////////////////////////

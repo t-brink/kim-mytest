@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2017,2018,2019 Tobias Brink
+  Copyright (c) 2013,2017,2018,2019,2020 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -1014,6 +1014,15 @@ namespace mytest {
 
     double get_parameter_double(const std::string& param_name,
                                 const unsigned index);
+
+    /** Write model parameters to files.
+
+        @param directory The directory into which the files are
+                         written. Has to exist and be writable.
+        @param name The name of the new parameterized KIM model.
+     */
+    void write_kim_parameters(const std::string& directory,
+                              const std::string& name) const;
 
     /** Optimize box vector lengths to minimize energy.
 
