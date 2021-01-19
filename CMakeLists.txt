@@ -25,9 +25,7 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-list(APPEND CMAKE_PREFIX_PATH $ENV{KIM_API_CMAKE_PREFIX_DIR})
 find_package(KIM-API 2.2 REQUIRED CONFIG)
-#find_package(KIM-API-ITEMS 2.2 REQUIRED CONFIG)
 
 # End preamble
 
@@ -39,7 +37,7 @@ set_target_properties(${TEST_NAME} PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(${TEST_NAME} kim-api nlopt KIM-API::kim-api)
+target_link_libraries(${TEST_NAME} KIM-API::kim-api nlopt)
 
 
 add_executable(test_switch_params core.cpp elastic.cpp dsl.cpp
@@ -49,7 +47,7 @@ set_target_properties(test_switch_params PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(test_switch_params kim-api nlopt KIM-API::kim-api)
+target_link_libraries(test_switch_params KIM-API::kim-api nlopt)
 
 
 
@@ -60,7 +58,7 @@ set_target_properties(test_unit_conv PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(test_unit_conv kim-api nlopt KIM-API::kim-api)
+target_link_libraries(test_unit_conv KIM-API::kim-api nlopt)
 
 
 add_executable(test_benchmark core.cpp elastic.cpp dsl.cpp
@@ -70,7 +68,7 @@ set_target_properties(test_benchmark PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(test_benchmark kim-api nlopt KIM-API::kim-api)
+target_link_libraries(test_benchmark KIM-API::kim-api nlopt)
 
 
 add_executable(test_write_params core.cpp elastic.cpp dsl.cpp
@@ -80,4 +78,4 @@ set_target_properties(test_write_params PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(test_write_params kim-api nlopt KIM-API::kim-api)
+target_link_libraries(test_write_params KIM-API::kim-api nlopt)
