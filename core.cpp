@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013,2014,2017,2018,2019,2020 Tobias Brink
+  Copyright (c) 2013,2014,2017,2018,2019,2020,2021 Tobias Brink
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
