@@ -117,7 +117,7 @@ void mytest::parse(string command,
                                 );
       boxes[tokens[1]] = move(p);
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "random_box") {
@@ -141,7 +141,7 @@ void mytest::parse(string command,
                         _DSL_RNG_);
       boxes[tokens[1]] = move(p);
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "copy_box") {
@@ -159,7 +159,7 @@ void mytest::parse(string command,
       auto p = make_unique<Box>(*(box->second), tokens[2]);
       boxes[tokens[2]] = move(p);
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "delete_atom") {
@@ -210,7 +210,7 @@ void mytest::parse(string command,
                        forward_as_tuple(make_unique<Box>(*(iter->second)),
                                         tokens[3]));
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "deform_box") {
@@ -264,7 +264,7 @@ void mytest::parse(string command,
         iter->second.compute();
       }
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     const chrono::steady_clock::time_point stop = chrono::steady_clock::now();
@@ -277,6 +277,11 @@ void mytest::parse(string command,
     }
     cout << endl;
   } else if (tokens[0] == "check_testfile") {
+    bool check_atom_energy = true;
+    if (tokens.size() == 5 && tokens[4] == "ignore_atom_energy") {
+      check_atom_energy = false;
+      tokens.pop_back();
+    }
     if (tokens.size() != 4) {
       cout << "Wrong number of arguments." << endl;
       return;
@@ -334,7 +339,7 @@ void mytest::parse(string command,
     try {
       iter->second.compute();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     double max_err_energy = 0.0;
@@ -344,8 +349,10 @@ void mytest::parse(string command,
     // Compare.
     for (unsigned i = 0; i < natoms; ++i) {
       //
-      double delta_E = abs(iter->second.get_energy(i) - energies(i));
-      if (delta_E > max_err_energy) max_err_energy = delta_E;
+      if (check_atom_energy) {
+        double delta_E = abs(iter->second.get_energy(i) - energies(i));
+        if (delta_E > max_err_energy) max_err_energy = delta_E;
+      }
       //
       for (unsigned dim = 0; dim < 3; ++dim) {
         double delta_F = abs(iter->second.get_force(i,dim) - forces(i,dim));
@@ -366,12 +373,14 @@ void mytest::parse(string command,
     bool has_err = (abs(max_err_energy) > 1e-5)
                 || (abs(max_err_force) > 1e-5);
     bool has_err_stress = abs(max_err_stress) > 1e-4;
-    cout << "Maximum particle energy deviation: " << max_err_energy;
-    if (has_err)
-      cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-    else if (has_err_stress)
-      cout << "     !!!"; // just for grepping
-    cout << endl;
+    if (check_atom_energy) {
+      cout << "Maximum particle energy deviation: " << max_err_energy;
+      if (has_err)
+        cout << "     !!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+      else if (has_err_stress)
+        cout << "     !!!"; // just for grepping
+      cout << endl;
+    }
     //
     cout << "Maximum force deviation: " << max_err_force;
     if (has_err)
@@ -415,7 +424,7 @@ void mytest::parse(string command,
       cout << "Cohesive energy is now " << comp.get_energy_per_atom() << " eV/atom"
            << endl;
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "optimize_positions") {
@@ -441,7 +450,7 @@ void mytest::parse(string command,
       cout << "Cohesive energy is now " << comp.get_energy_per_atom() << " eV/atom"
            << endl;
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "bulk_modulus_energy") {
@@ -565,7 +574,7 @@ void mytest::parse(string command,
       }
       iter_comp->second.change_box(move(b));
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
   } else if (tokens[0] == "scale") {
@@ -600,7 +609,7 @@ void mytest::parse(string command,
     try {
       max_diff_force = iter->second.max_diff_force();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     cout << "Maximum force deviation: " << max_diff_force;
@@ -637,7 +646,7 @@ void mytest::parse(string command,
     try {
       max_diff_force = iter->second.max_diff_force_fast();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     cout << "Maximum force deviation: " << max_diff_force;
@@ -657,7 +666,7 @@ void mytest::parse(string command,
     try {
       iter->second.compute();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     unsigned N = iter->second.get_natoms();
@@ -684,7 +693,7 @@ void mytest::parse(string command,
     try {
       iter->second.compute();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     unsigned N = iter->second.get_natoms();
@@ -743,7 +752,7 @@ void mytest::parse(string command,
     try {
       iter->second.compute();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     Voigt6<double> virial = iter->second.get_virial();
@@ -815,7 +824,7 @@ void mytest::parse(string command,
     try {
       iter->second.compute();
     } catch (const exception& e) {
-      cout << e.what() << endl;
+      cout << e.what() << " !!!" << endl;
       return;
     }
     Voigt6<double> virial = iter->second.get_virial();

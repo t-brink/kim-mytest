@@ -25,6 +25,8 @@
 
 cmake_minimum_required(VERSION 3.10)
 
+project(mytest)
+
 find_package(KIM-API 2.2 REQUIRED CONFIG)
 
 # End preamble

@@ -39,11 +39,9 @@ double get_displ_energy(Compute& compute,
   Vec3D<double> new_pos(orig_pos);
   new_pos[dim] += eps;
   compute.set_position(i, new_pos);
-  compute.update_neighbor_list();
   compute.compute();
   double E = compute.get_energy();
   compute.set_position(i, orig_pos);
-  compute.update_neighbor_list();
   return E;
 }
 
@@ -155,19 +153,15 @@ double Compute::max_diff_force_fast() {
       Vec3D<double> new_pos(orig_pos);
       new_pos[dim] += h;
       this->set_position(i, new_pos);
-      // Enough to update ghosts, neighbor list changes are not important.
-      this->box_->update_ghosts(partcl_type_codes);
       this->compute();
       double Ep = this->get_energy();
       // Backward //////////////////////////////////////////////////////
       new_pos[dim] = orig_pos[dim] - h;
       this->set_position(i, new_pos);
-      this->box_->update_ghosts(partcl_type_codes);
       this->compute();
       double En = this->get_energy();
       // Reset /////////////////////////////////////////////////////////
       this->set_position(i, orig_pos);
-      this->box_->update_ghosts(partcl_type_codes);
       // Eval. /////////////////////////////////////////////////////////
       double num_force = -(Ep - En) / (2 * h);
       double diff = abs(the_forces(i, dim) - num_force);

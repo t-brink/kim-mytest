@@ -24,6 +24,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--only-fast", action="store_true", default=False)
 parser.add_argument("--verbose", action="store_true", default=False)
 parser.add_argument("--zbl", action="store_true", default=False)
+parser.add_argument("--no-atom-energy", action="store_true", default=False,
+                    help="do not compare per-atom energy to LAMMPS (e.g. when "
+                         "using a different distribution of 3rd-body terms")
 parser.add_argument("kim_model")
 parser.add_argument("potfile")
 parser.add_argument("lattices", nargs="+")
@@ -53,7 +56,10 @@ lammps_cmd = ["/home/t.brink/bin/lmp_serial"]
 
 shear = 0.05
 
-commands = {"numer_forces_deriv": "1 1 1",
+commands = {"numer_forces_deriv": "1 1 2", # cannot use primitive unit cell,
+                                           # since it might only have one atom
+                                           # in which case deleting a random
+                                           # atom will obviously fail.
             "diff_total_energy_vs_particle_energy": "3 3 3",
             "diff_total_virial_vs_particle_virial": "3 3 3",
             "diff_total_virial_vs_virial_from_forces": "3 3 3",
@@ -373,7 +379,8 @@ with tempfile.TemporaryDirectory() as tmpdir:
         fname = os.path.basename(box)
         boxname = fname.rsplit(".", 1)[0]
         ex("println")
-        ex("check_testfile comp {} {}".format(box, boxname))
+        ign_flag = "ignore_atom_energy" if args.no_atom_energy else ""
+        ex("check_testfile comp {} {} {}".format(box, boxname, ign_flag))
 
     proc.stdin.close()
     proc.wait()

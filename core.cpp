@@ -974,9 +974,11 @@ void Compute::compute() {
   if (box_->nghosts)
     for (unsigned i = box_->natoms; i < box_->nall; ++i) {
       const unsigned central = i % box_->natoms;
+      /* KIM forbids ghost atoms to have an energy :-(
       if (has_particleEnergy) {
         particleEnergy[central] += particleEnergy[i];
       }
+      */
       if (has_forces) {
         forces[3*central + 0] += forces[3*i + 0];
         forces[3*central + 1] += forces[3*i + 1];
